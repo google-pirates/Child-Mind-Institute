@@ -1,6 +1,6 @@
 from sklearn.linear_model import LinearRegression
 
-def model(x,y):
+def model(X,y):
     lr = LinearRegression
-    ret = lr.fit(x,y)
+    ret = lr.fit(X,y)
     return ret
