@@ -1,18 +1,14 @@
 # pylint: disable=no-member
-from typing import Type
 import torch
-from torch import nn
 from torch.utils.data import DataLoader
 
 def inference(model_path: str,
-              model: Type[nn.Module],
               test_data_loader: DataLoader) -> torch.Tensor:
     """
     Infer using trained model.
 
     Parameters:
     - model_path (str): Path to the saved model.
-    - model (nn.Module): The model architecture.
     - test_data_loader (DataLoader): DataLoader for the inference.
 
     Returns:
@@ -20,9 +16,8 @@ def inference(model_path: str,
     """
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = torch.jit.load(model_path, map_location=device)
     model.to(device)
-
-    model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
 
     all_preds = []
@@ -31,7 +26,18 @@ def inference(model_path: str,
         for inputs in test_data_loader:
             inputs = inputs.to(device)
             outputs = model(inputs)
-            _, preds = torch.max(outputs, 1)
+
+            probabilities = torch.softmax(outputs, dim=1)
+
+            _, preds = torch.max(probabilities, 1)
+
             all_preds.append(preds.cpu())
+
+
+    ## Submission phase
+    submission_columns = ['series_id','step','event','score']
+    submission = None
+    submission.to_csv('submission.csv', index=False)
+    ## Points for discussion
 
     return torch.cat(all_preds)
