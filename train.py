@@ -1,9 +1,10 @@
 import copy
 import torch
 from torch import nn, optim
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import (
+    StepLR, ExponentialLR, MultiStepLR, ReduceLROnPlateau
+)
 from torch.utils.data import DataLoader
-
 
 def train(
         model: nn.Module,
@@ -13,8 +14,8 @@ def train(
         optimizer: optim.Optimizer,
         num_epochs: int,
         save_path: str,
-        scheduler_step_size: int,
-        scheduler_gamma: float,
+        scheduler_class=StepLR,
+        scheduler_params=None,
         **kwargs
 ) -> nn.Module:
     """
@@ -26,14 +27,18 @@ def train(
     - valid_dataloader (DataLoader): DataLoader for validation data.
     - criterion (nn.Module): Loss function.
     - optimizer (optim.Optimizer): Optimizer.
-    - num_epochs (int): Number of epochs.
+    - num_epochs (int): Number of training epochs.
     - save_path (str): Path to save the best model.
-    - scheduler_step_size (int): Step size for scheduler reduction.
-    - scheduler_gamma (float): Learning rate reduction ratio.
+    - scheduler_class (Scheduler): The learning rate scheduler class. 
+      Defaults to StepLR. Options include: StepLR, ExponentialLR, MultiStepLR, ReduceLROnPlateau.
+    - scheduler_params (dict): Parameters to initialize the scheduler. 
+      Defaults to StepLR: {'step_size': 10, 'gamma': 0.1}.
 
     Returns:
     - nn.Module: The model based on lowest valid loss.
     """
+    if scheduler_params is None:
+        scheduler_params = {'step_size': 10, 'gamma': 0.1} ## need to refactoring
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
@@ -41,8 +46,7 @@ def train(
     best_model = None
     best_loss = float("inf")
 
-    scheduler = StepLR(optimizer, step_size=scheduler_step_size,
-                       gamma=scheduler_gamma)
+    scheduler = scheduler_class(optimizer, **scheduler_params)
 
     for epoch in range(num_epochs):
         # Training phase
@@ -58,7 +62,10 @@ def train(
             training_loss += loss.item()
         print(f"Epoch {epoch + 1}/{num_epochs}, Training Loss: "
               f"{training_loss / len(train_dataloader)}")
-        scheduler.step()
+
+        # Scheduler step (if not using ReduceLROnPlateau)
+        if not isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+            scheduler.step()
 
         # Validation phase
         model.eval()
@@ -71,6 +78,10 @@ def train(
                 valid_loss += loss.item()
         print(f"Epoch {epoch + 1}/{num_epochs}, Validation Loss: "
               f"{valid_loss / len(valid_dataloader)}")
+
+        # Scheduler step (if using ReduceLROnPlateau)
+        if isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+            scheduler.step(valid_loss / len(valid_dataloader))
 
         # Save the best model
         if valid_loss < best_loss:
