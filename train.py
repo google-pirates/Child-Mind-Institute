@@ -1,29 +1,34 @@
-from typing import Type
 import copy
 import torch
 from torch import nn, optim
+from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 
 
-def train(model: Type[nn.Module],
-          train_data_loader: DataLoader,
-          val_data_loader: DataLoader,
+def train(model: nn.Module,
+          train_dataloader: DataLoader,
+          valid_dataloader: DataLoader,
           criterion: nn.Module,
           optimizer: optim.Optimizer,
           num_epochs: int,
-          save_path: str) -> Type[nn.Module]:
+          save_path: str,
+          scheduler_step_size: int,
+          scheduler_gamma: float,
+          **kwargs) -> nn.Module:
     """
     Train model, save and return best model.
 
     Parameters:
     - model (nn.Module): Model to train.
-    - train_data_loader (DataLoader): DataLoader for train
-    - val_data_loader (DataLoader): DataLoader for valid
+    - train_dataloader (DataLoader): DataLoader for train
+    - valid_dataloader (DataLoader): DataLoader for valid
     - criterion (nn.Module): Loss func.
     - optimizer (optim.Optimizer): Optimizer
     - num_epochs (int): Number of epochs
     - save_path (str): path to save the best model.
-    
+    - scheduler_step_size (int): Number of scheduler reduction step
+    - scheduler_gamma (float): learning rate reduction ratio.
+
     Returns:
     - best_model (nn.Module): The model based on lowest valid loss.
     """
@@ -34,36 +39,40 @@ def train(model: Type[nn.Module],
     best_model = copy.deepcopy(model.state_dict())
     best_loss = float("inf")
 
+    scheduler = StepLR(optimizer, step_size=scheduler_step_size, gamma=scheduler_gamma)
+    
     for epoch in range(num_epochs):
         ## training phase
         model.train()
-        running_loss_train = 0.0
-        for inputs, labels in train_data_loader():
+        training_loss = 0.0
+        for inputs, labels in train_dataloader:
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
-            running_loss_train += loss.item()
-        print(f"Epoch {epoch+1}/{num_epochs}, Training Loss: {running_loss_train/len(train_data_loader)}")
-
+            training_loss += loss.item()
+        print(f"Epoch {epoch+1}/{num_epochs}, Training Loss: {training_loss/len(train_dataloader)}")
+        scheduler.step()
+        
         ## validation phase
         model.eval()
-        running_loss_val = 0.0
+        valid_loss = 0.0
         with torch.no_grad():
-            for inputs, labels in val_data_loader:
+            for inputs, labels in valid_dataloader:
                 inputs, labels = inputs.to(device), labels.to(device)
                 outputs = model(inputs)
                 loss = criterion(outputs, labels)
-                running_loss_val += loss.item()
-        print(f"Epoch {epoch+1}/{num_epochs}, Validation Loss: {running_loss_val/len(val_data_loader)}")
+                valid_loss += loss.item()
+        print(f"Epoch {epoch+1}/{num_epochs}, Validation Loss: {valid_loss/len(valid_dataloader)}")
 
         ## save the best model
-        if running_loss_val < best_loss:
-            best_loss = running_loss_val
+        if valid_loss < best_loss:
+            best_loss = valid_loss
             best_model = copy.deepcopy(model.state_dict())
-            torch.save(best_model, save_path)
+            scripted_model = torch.jit.script(model)
+            torch.jit.save(scripted_model, save_path)
             print(f"Best model saved to {save_path}")
 
     model.load_state_dict(best_model)
