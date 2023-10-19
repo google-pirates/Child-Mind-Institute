@@ -1,36 +1,39 @@
 import os
 import torch
 from torch.utils.data import Dataset, DataLoader
-from torchvision.io import read_image
-
-base_dir = '/kaggle/input/child-mind-institute-detect-sleep-states'
-
-transform = None  # 필요한 전처리 변환을 여기에 추가
+import pandas as pd
+import numpy as np
 
 class ChildInstituteDataset(Dataset):
-    def __init__(self, data, transform=None):
-        """
-        Args:
-            transform (callable, optional): 데이터에 적용할 변환(transform) 함수.
-        """
+    def __init__(self, data):
         self.data = data 
-        self.transform = transform
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        return self.data[idx]
+        return {
+            'X': self.data[idx].filter(items=['anglez', 'enmo']).values,
+            'step': self.data[idx].filter(items=['step']).values
+        }
+ 
+def to_list(data):
+    #series_id 별로 묶인 df 를 리스트화 해서 return
+    list_data = list(data.groupby('series_id'))
+    return list_data
 
-#dataset
-train_series_dataset = ChildInstituteDataset(base_dir+'/train_series.parquet', transform=transform)
-train_events_dataset = ChildInstituteDataset(base_dir+'/train_events.csv', transform=transform)
-test_series_dataset = ChildInstituteDataset(base_dir+'/test_series.parquet', transform=transform)
+def preprocessing(data, window_size, **kwargs):
+    #train 이든 test든 들어와서 변환할 전처리 과정
+    #추후 사용될 전처리 논의 후 추가할 예정
+    preprocessed_data = np.lib.stride_tricks.sliding_window_view(data[1].anglez, window_size)
 
-#batch size
-batch_size = 32
+    return preprocessed_data
 
-#data loader
-train_series_data_loader = DataLoader(train_series_dataset, batch_size=batch_size, shuffle=True)
-train_events_data_loader = DataLoader(train_events_dataset, batch_size=batch_size, shuffle=False)
-test_series_data_loader = DataLoader(test_series_dataset, batch_size=batch_size, shuffle=False)
+def dataloader(data, batch_size):
+    #dataset
+    dataset = ChildInstituteDataset(data)
+
+    #data loader
+    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+    return data_loader
