@@ -3,8 +3,8 @@ import torch
 from torch.utils.data import DataLoader
 import pandas as pd
 
-def inference(model_path: str,
-              test_dataloader: DataLoader):
+
+def inference(model_path: str, test_dataloader: DataLoader, device):
     """
     Infer using trained model.
 
@@ -16,7 +16,7 @@ def inference(model_path: str,
     - DataFrame: Contains series_id, step, event, and score columns.
     """
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = torch.jit.load(model_path, map_location=device)
     model.to(device)
     model.eval()
