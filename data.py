@@ -19,7 +19,9 @@ class ChildInstituteDataset(Dataset):
  
 def to_list(data):
     #series_id 별로 묶인 df 를 리스트화 해서 return
-    list_data = list(data.groupby('series_id'))
+    list_data = []
+    for dat in data.groupby('series_id'):
+        list_data.append(dat[1])
     return list_data
 
 def preprocessing(data, window_size, **kwargs):
