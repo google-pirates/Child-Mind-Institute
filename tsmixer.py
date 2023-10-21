@@ -70,15 +70,13 @@ class TSMixer(nn.Module):
             raise ValueError("n_block should be greater than 0.")
 
         self.in_channels = config.get('train').get('n_features')
-        self.blocks = nn.ModuleList(
-            [ResBlock(config) for _ in range(self.n_block)]
-        )
+        self.blocks = nn.ModuleList([ResBlock(config) for _ in range(self.n_block)])
 
         self.final_dense = nn.Linear(self.in_channels, self.out_seq_len)
 
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
-        x = batch.get('X') # batch, seq_len, n_features
+        x = batch.get('X')  # batch, seq_len, n_features
         for block in self.blocks:
             x = block(x)
 
