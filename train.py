@@ -1,10 +1,15 @@
+import argparse
 import copy
 import torch
 from torch import nn, optim
 from torch.optim.lr_scheduler import (
     StepLR, ExponentialLR, MultiStepLR, ReduceLROnPlateau
 )
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
+from tensorboardX import SummaryWriter
+from models.cnn import CNN
+import yaml
+from dataloader import preprocessing, to_list, ChildInstituteDataset
 
 def train(
         model: nn.Module,
@@ -92,3 +97,70 @@ def train(
             print(f"Best model saved to {save_path}")
 
     return scripted_model
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Train a model.")
+    parser.add_argument("--exp_name", type=str, required=True)
+    args = parser.parse_args()
+
+    #### config load ####
+    config = {}
+    with open('configs/general_config.yaml', 'r') as f:
+        general_config = yaml.safe_load(f)
+    with open('configs/model_config.yaml', 'r') as f:
+        model_config = yaml.safe_load(f)
+    with open('configs/train_config.yaml', 'r') as f:
+        train_config = yaml.safe_load(f)
+
+    if general_config:
+        config.update(general_config)
+    if model_config:
+        config.update(model_config)
+    if train_config:
+        config.update(train_config)
+
+
+    # Tensorboard
+    writer = SummaryWriter(log_dir=f"runs/{args.exp_name}")
+
+    DATA_PATH = "train_data"
+
+    preprocessed_data = preprocessing(DATA_PATH)
+
+    ## train,test split 시 series_id 별로 split 할지, 
+    ## 전체 데이터에 대해 split할지 결정 필요
+    ## 일단 series_id 별로 split 적용
+    train_list = to_list(preprocessed_data)
+
+    train_data_list = []
+    valid_data_list = []
+    for df in train_list:
+        train_size = int(.8*len(df))
+
+        train_df = df[:train_size]
+        valid_df = df[train_size:]
+
+        train_data_list.append(train_df)
+        valid_data_list.append(valid_df)
+
+    train_dataset = ChildInstituteDataset(train_data_list)
+    valid_dataset = ChildInstituteDataset(valid_data_list)
+
+    BATCH_SIZE = config.get('train').get('batch_size')
+    train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    valid_dataloader = DataLoader(valid_dataset, batch_size=BATCH_SIZE, shuffle=False)
+
+    #### train ###
+    model_name = config.get('train').get('model')
+    model_class = getattr(nn, model_name)
+    model = model_class(config)
+
+    trained_model = train(
+        model=model,
+        train_dataloader=train_dataloader,
+        valid_dataloader=valid_dataloader,
+        criterion=config.get('train').get('criterion'),
+        optimizer = config.get('train').get('Adam') ,
+        num_epochs=config.get('train').get('epochs'),
+        save_path=f"saved_models/{args.exp_name}.pt"
+    )
