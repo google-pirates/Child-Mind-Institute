@@ -29,11 +29,3 @@ def preprocessing(data, window_size, **kwargs):
 
     return preprocessed_data
 
-def dataloader(data, batch_size):
-    #dataset
-    dataset = ChildInstituteDataset(data)
-
-    #data loader
-    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-
-    return data_loader
