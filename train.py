@@ -3,12 +3,13 @@ import copy
 import torch
 from torch import nn, optim
 from torch.optim.lr_scheduler import *
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
+from sklearn import train_test_split
 from torch.utils.tensorboard import SummaryWriter
 from models.cnn import CNN
 import yaml
 from dataloader import preprocess, to_list, ChildInstituteDataset
-from util import load_config, make_logdir
+from util import load_config, make_logdir, update_config_from_args
 
 
 def train(
@@ -111,6 +112,8 @@ if __name__ == "__main__":
 
     #### config load ####
     config = load_config()
+    # Update exp_name args to 'general' config
+    config = update_config_from_args(config, exp_name=args.exp_name)
 
     # Tensorboard
     log_dir = make_logdir("runs", args.exp_name)
@@ -118,19 +121,19 @@ if __name__ == "__main__":
 
     preprocessed_data = preprocess(config.get('general').get('data').get('data_path'))
 
-    ## train,test split 시 series_id 별로 split 할지, 
+    ## train,test split 시 series_id 별로 split 할지,
     ## 전체 데이터에 대해 split할지 결정 필요
     ## 일단 series_id 별로 split 적용
     train_list = to_list(preprocessed_data)
 
     train_data_list = []
     valid_data_list = []
+
+    ## define valid size from config. default = 0.2
+    valid_set_size = config.get('train').get('valid_size', 0.2)
+
     for df in train_list:
-        train_size = int(.8*len(df))
-
-        train_df = df[:train_size]
-        valid_df = df[train_size:]
-
+        train_df, valid_df = train_test_split(df, test_size=valid_set_size, shuffle=False)
         train_data_list.append(train_df)
         valid_data_list.append(valid_df)
 
@@ -155,7 +158,7 @@ if __name__ == "__main__":
         train_dataloader=train_dataloader,
         valid_dataloader=valid_dataloader,
         criterion=config.get('train').get('criterion'),
-        optimizer = config.get('train').get('Adam') ,
+        optimizer = config.get('train').get('optimizer') ,
         num_epochs=config.get('train').get('epochs'),
         save_path=f"{log_dir}/{args.exp_name}.pt",
         scheduler_class=scheduler_class,

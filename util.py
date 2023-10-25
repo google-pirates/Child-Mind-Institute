@@ -28,3 +28,21 @@ def make_logdir(base_dir : str, exp_name : str) -> str:
         cnt += 1
         log_dir = os.path.join(base_dir, f"{exp_name}_{cnt}")
     return log_dir
+
+def update_config_from_args(config, exp_name):
+    """ Update the 'general' key of the config dict based on the exp_name """
+
+    exp_params = exp_name.split(',')
+    for param in exp_params:
+        key, value = param.split("=")
+
+        try:
+            value = int(value)
+        except ValueError:
+            try:
+                value = float(value)
+            except ValueError:
+                pass
+        config['general'].update({key: value})
+    
+    return config
