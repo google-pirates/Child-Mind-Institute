@@ -1,6 +1,8 @@
 general:
   data:
     data_path: ...
+  test_data:
+    data_path: ...
 
 model:
   cnn:
@@ -31,4 +33,4 @@ train:
     gamma: ...
 
 inference:
-  
+  batch_size: ...
