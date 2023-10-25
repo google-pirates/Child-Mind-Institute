@@ -105,18 +105,14 @@ def train(
 
     return scripted_model, train_losses, valid_losses
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train a model.")
-    parser.add_argument("--exp_name", type=str, required=True)
-    args = parser.parse_args()
-
+def train_main(exp_name):
     #### config load ####
     config = load_config()
     # Update exp_name args to 'general' config
-    config = update_config_from_args(config, exp_name=args.exp_name)
+    config = update_config_from_args(config, exp_name=exp_name)
 
     # Tensorboard
-    log_dir = make_logdir("runs", args.exp_name)
+    log_dir = make_logdir("runs", exp_name)
     writer = SummaryWriter(log_dir=log_dir)
 
     preprocessed_data = preprocess(config.get('general').get('data').get('data_path'))
@@ -160,7 +156,7 @@ if __name__ == "__main__":
         criterion=config.get('train').get('criterion'),
         optimizer = config.get('train').get('optimizer') ,
         num_epochs=config.get('train').get('epochs'),
-        save_path=f"{log_dir}/{args.exp_name}.pt",
+        save_path=f"{log_dir}/{exp_name}.pt",
         scheduler_class=scheduler_class,
         scheduler_params=config.get('train').get('scheduler_params')
     )
