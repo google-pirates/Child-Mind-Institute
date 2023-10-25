@@ -1,10 +1,13 @@
 # pylint: disable=no-member
+import argparse
 import torch
 from torch.utils.data import DataLoader
 import pandas as pd
+from dataloader import ChildInstituteDataset, to_list, preprocess
+from utils import load_config
 
 
-def inference(model_path: str, test_dataloader: DataLoader, device):
+def inference(model_path: str, test_dataloader: DataLoader):
     """
     Infer using trained model.
 
@@ -16,7 +19,8 @@ def inference(model_path: str, test_dataloader: DataLoader, device):
     - DataFrame: Contains series_id, step, event, and score columns.
     """
 
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
     model = torch.jit.load(model_path, map_location=device)
     model.to(device)
     model.eval()
@@ -63,3 +67,26 @@ def inference(model_path: str, test_dataloader: DataLoader, device):
     submission.to_csv('submission.csv', index=False)
 
     return submission
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Inference using trained model.")
+    parser.add_argument("--checkpoint", type=str, required=True)
+    args = parser.parse_args()
+
+    #### config load ####
+    config = load_config()
+
+    # Load preprocessed data for inference
+    data_path = config.get('general').get('test_data').get('data_path')
+    preprocessed_data = preprocess(data_path)
+
+    # Convert data to DataLoader format
+    test_list = to_list(preprocessed_data)
+    test_dataset = ChildInstituteDataset(test_list)
+
+    BATCH_SIZE = config.get('inference').get('batch_size')
+    test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+
+    # Perform inference
+    submission = inference(model_path=args.checkpoint, test_dataloader=test_dataloader)
+
