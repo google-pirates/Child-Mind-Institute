@@ -30,7 +30,7 @@ def inference(model_path: str, test_dataloader: DataLoader, device):
         for data in test_dataloader:
             inputs = data["data"].to(device)
             series_id = data["series_id"]
-            step = data["step"]
+            event_step = data["step"]
             
             outputs = model(inputs)
 
@@ -47,7 +47,7 @@ def inference(model_path: str, test_dataloader: DataLoader, device):
             scores = [scores[i, pred].item() for i, pred in enumerate(preds.cpu().numpy())]
 
             all_series_ids.extend(series_id)
-            all_steps.extend(step)
+            all_steps.extend(event_step)
             all_events.extend(events)
             all_scores.extend(scores)
 
