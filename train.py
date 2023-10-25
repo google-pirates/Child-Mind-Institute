@@ -4,7 +4,7 @@ import torch
 from torch import nn, optim
 from torch.optim.lr_scheduler import *
 from torch.utils.data import DataLoader
-from sklearn import train_test_split
+from sklearn.model_selection import train_test_split
 from torch.utils.tensorboard import SummaryWriter
 from models.cnn import CNN
 import yaml
