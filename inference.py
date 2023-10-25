@@ -68,11 +68,7 @@ def inference(model_path: str, test_dataloader: DataLoader):
 
     return submission
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Inference using trained model.")
-    parser.add_argument("--checkpoint", type=str, required=True)
-    args = parser.parse_args()
-
+def inference_main(checkpoint):
     #### config load ####
     config = load_config()
 
@@ -88,5 +84,5 @@ if __name__ == "__main__":
     test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
     # Perform inference
-    submission = inference(model_path=args.checkpoint, test_dataloader=test_dataloader)
+    submission = inference(model_path = checkpoint, test_dataloader=test_dataloader)
 
