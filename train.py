@@ -1,48 +1,39 @@
-import argparse
 import copy
+import pandas as pd
 import torch
+import yaml
+from sklearn.model_selection import train_test_split
 from torch import nn, optim
 from torch.optim.lr_scheduler import *
 from torch.utils.data import DataLoader
-from sklearn.model_selection import train_test_split
 from torch.utils.tensorboard import SummaryWriter
+
+from dataloader import ChildInstituteDataset, preprocess, to_list
 from models.cnn import CNN
-import yaml
-from dataloader import preprocess, to_list, ChildInstituteDataset
 from util import load_config, make_logdir, update_config_from_args
 
 
-def train(
-        model: nn.Module,
-        train_dataloader: DataLoader,
-        valid_dataloader: DataLoader,
-        criterion: nn.Module,
-        optimizer: optim.Optimizer,
-        num_epochs: int,
-        save_path: str,
-        scheduler_class=torch.optim.lr_scheduler.StepLR,
-        scheduler_params=None,
-        **kwargs
-) -> nn.Module:
+def train(config: dict, model: nn.Module, train_dataloader: DataLoader, 
+          valid_dataloader: DataLoader, writer) -> nn.Module:
     """
     Train model, save and return best model.
 
     Parameters:
+    - config (dict): Configuration dictionary.
     - model (nn.Module): Model to train.
     - train_dataloader (DataLoader): DataLoader for train data.
     - valid_dataloader (DataLoader): DataLoader for validation data.
-    - criterion (nn.Module): Loss function.
-    - optimizer (optim.Optimizer): Optimizer.
-    - num_epochs (int): Number of training epochs.
-    - save_path (str): Path to save the best model.
-    - scheduler_class (Scheduler): The learning rate scheduler class. 
-      Defaults to StepLR. Options include: StepLR, ExponentialLR, MultiStepLR, ReduceLROnPlateau.
-    - scheduler_params (dict): Parameters to initialize the scheduler. 
-      Defaults to StepLR: {'step_size': 10, 'gamma': 0.1}.
 
     Returns:
     - nn.Module: The model based on lowest valid loss.
     """
+    criterion = config.get('train').get('criterion')
+    optimizer = config.get('train').get('optimizer')
+    num_epochs = config.get('train').get('epochs')
+    save_path = config.get('train').get('save_path')
+    scheduler_class = config.get('train').get('scheduler_class', torch.optim.lr_scheduler.StepLR)
+    scheduler_params = config.get('train').get('scheduler_params', {'step_size': 10, 'gamma': 0.1})
+
     if scheduler_params is None:
         scheduler_params = {'step_size': 10, 'gamma': 0.1} ## need to refactoring
 
@@ -73,10 +64,13 @@ def train(
         avg_train_loss = training_loss / len(train_dataloader)
         train_losses.append(avg_train_loss)
         print(f"Epoch {epoch + 1}/{num_epochs}, Training Loss: {avg_train_loss}")
+        writer.add_scalar('Loss/train', avg_train_loss, epoch)
 
-        # Scheduler step (if not using ReduceLROnPlateau)
+        # ReduceLROnPlateau를 사용하지 않는 경우 lr 업데이트 & 로깅
         if not isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
             scheduler.step()
+            current_lr = scheduler.get_last_lr()[0]
+            writer.add_scalar('Learning Rate', current_lr, epoch)
 
         # Validation phase
         model.eval()
@@ -90,10 +84,13 @@ def train(
         avg_valid_loss = valid_loss / len(valid_dataloader)
         valid_losses.append(avg_valid_loss)
         print(f"Epoch {epoch + 1}/{num_epochs}, Validation Loss: {avg_valid_loss}")
+        writer.add_scalar('Loss/valid', avg_valid_loss, epoch)
 
-        # Scheduler step (if using ReduceLROnPlateau)
+        # ReduceLROnPlateau를 사용하는 경우 lr 업데이트 & 로깅
         if isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
             scheduler.step(valid_loss / len(valid_dataloader))
+            current_lr = scheduler.optimizer.param_groups[0]['lr']
+            writer.add_scalar('Learning Rate', current_lr, epoch)
 
         # Save the best model
         if valid_loss < best_loss:
@@ -103,28 +100,41 @@ def train(
             torch.jit.save(scripted_model, save_path)
             print(f"Best model saved to {save_path}")
 
-    return scripted_model, train_losses, valid_losses
+    return scripted_model
 
-def train_main(exp_name):
+def main(exp_name):
     #### config load ####
     config = load_config()
     # Update exp_name args to 'general' config
-    config = update_config_from_args(config, exp_name=exp_name)
+    config = update_config_from_args(config, exp_name)
 
     # Tensorboard
     log_dir = make_logdir("runs", exp_name)
     writer = SummaryWriter(log_dir=log_dir)
 
-    preprocessed_data = preprocess(config.get('general').get('data').get('data_path'))
+    ## train data merge
+    train_series_path = config.get('general').get('data').get('train_series_path')
+    train_events_path = config.get('general').get('data').get('train_events_path')
+    train_series = pd.read_parquet(train_series_path)
+    train_events = pd.read_csv(train_events_path)
+    ## 임의로 결측치는 0으로 채움
+    merged_train_data = pd.merge(train_series, train_events,
+                                 on=['series_id', 'step', 'timestamp'],
+                                 how='left').fillna(0)
 
-    ## train,test split 시 series_id 별로 split 할지,
-    ## 전체 데이터에 대해 split할지 결정 필요
-    ## 일단 series_id 별로 split 적용
-    train_list = to_list(preprocessed_data)
+    preprocessed_data = preprocess(merged_train_data)
+
+    window_size = config.get('train').get('window_size')
+    step = config.get('train').get('step')
+
+    train_list = to_list(preprocessed_data, window_size, config, step)
 
     train_data_list = []
     valid_data_list = []
 
+    ## train,test split 시 series_id 별로 split 할지,
+    ## 전체 데이터에 대해 split할지 결정 필요
+    ## 일단 series_id 별로 split 적용
     ## define valid size from config. default = 0.2
     valid_set_size = config.get('train').get('valid_size', 0.2)
 
@@ -145,23 +155,8 @@ def train_main(exp_name):
     model_class = getattr(nn, model_name)
     model = model_class(config)
 
-    # get Scheduler
-    scheduler_name = config.get('train').get('scheduler')
-    scheduler_class = getattr(torch.optim.lr_scheduler, scheduler_name)
-
-    trained_model, train_loss, valid_loss = train(
-        model=model,
-        train_dataloader=train_dataloader,
-        valid_dataloader=valid_dataloader,
-        criterion=config.get('train').get('criterion'),
-        optimizer = config.get('train').get('optimizer') ,
-        num_epochs=config.get('train').get('epochs'),
-        save_path=f"{log_dir}/{exp_name}.pt",
-        scheduler_class=scheduler_class,
-        scheduler_params=config.get('train').get('scheduler_params')
-    )
-
-    for epoch, (train_loss_by_epoch, valid_loss_by_epoch) in enumerate(zip(train_loss,valid_loss)):
-        writer.add_scalar('Loss/train', train_loss_by_epoch, epoch)
-        writer.add_scalar('Loss/valid', valid_loss_by_epoch, epoch)
-
+    trained_model = train(config=config, model=model,
+                          train_dataloader=train_dataloader,
+                          valid_dataloader=valid_dataloader,
+                          writer=writer)
+    writer.close()
