@@ -13,7 +13,7 @@ from models.cnn import CNN
 from util import load_config, make_logdir, update_config_from_args
 
 
-def train(config: dict, model: nn.Module, train_dataloader: DataLoader, 
+def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
           valid_dataloader: DataLoader, writer) -> nn.Module:
     """
     Train model, save and return best model.
@@ -114,7 +114,7 @@ def main(exp_name):
 
     ## train data merge
     data_path = config.get('general').get('data').get('data_path')
-    
+
     merged_train_data = pd.read_csv(data_path) ## merge한 파일의 형식에 따라 수정 필요
 
     preprocessed_data = preprocess(merged_train_data)
@@ -142,7 +142,8 @@ def main(exp_name):
     valid_dataset = ChildInstituteDataset(valid_data_list)
 
     BATCH_SIZE = config.get('train').get('batch_size')
-    train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    train_data_shuffle = config.get('train').get('data').get('shuffle')
+    train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=train_data_shuffle)
     valid_dataloader = DataLoader(valid_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
     #### train ###

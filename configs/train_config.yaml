@@ -1,6 +1,7 @@
 train:
   data:
     scaler: 'StandardScaler'
+    shuffle: 'False'
   model: 'cnn'
   n_features: ...
   seq_len: ...
