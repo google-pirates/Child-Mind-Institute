@@ -113,14 +113,9 @@ def main(exp_name):
     writer = SummaryWriter(log_dir=log_dir)
 
     ## train data merge
-    train_series_path = config.get('general').get('data').get('train_series_path')
-    train_events_path = config.get('general').get('data').get('train_events_path')
-    train_series = pd.read_parquet(train_series_path)
-    train_events = pd.read_csv(train_events_path)
-    ## 임의로 결측치는 0으로 채움
-    merged_train_data = pd.merge(train_series, train_events,
-                                 on=['series_id', 'step', 'timestamp'],
-                                 how='left').fillna(0)
+    data_path = config.get('general').get('data').get('data_path')
+    
+    merged_train_data = pd.read_csv(data_path) ## merge한 파일의 형식에 따라 수정 필요
 
     preprocessed_data = preprocess(merged_train_data)
 
