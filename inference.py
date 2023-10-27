@@ -1,10 +1,12 @@
 # pylint: disable=no-member
 import argparse
+
+import pandas as pd
 import torch
 from torch.utils.data import DataLoader
-import pandas as pd
-from dataloader import ChildInstituteDataset, to_list, preprocess
-from utils import load_config
+
+from data import ChildInstituteDataset, preprocess, to_list
+from utils import load_config 
 
 
 def inference(model_path: str, test_dataloader: DataLoader):
@@ -18,9 +20,8 @@ def inference(model_path: str, test_dataloader: DataLoader):
     Returns:
     - DataFrame: Contains series_id, step, event, and score columns.
     """
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
+
     model = torch.jit.load(model_path, map_location=device)
     model.to(device)
     model.eval()
@@ -35,7 +36,7 @@ def inference(model_path: str, test_dataloader: DataLoader):
             inputs = data["data"].to(device)
             series_id = data["series_id"]
             event_step = data["step"]
-            
+
             outputs = model(inputs)
 
             probabilities = torch.softmax(outputs, dim=1)
@@ -56,7 +57,6 @@ def inference(model_path: str, test_dataloader: DataLoader):
             all_scores.extend(scores)
 
     # Make submission file
-
     submission = pd.DataFrame({
         'series_id': all_series_ids,
         'step': all_steps,
@@ -68,21 +68,23 @@ def inference(model_path: str, test_dataloader: DataLoader):
 
     return submission
 
-def inference_main(checkpoint):
-    #### config load ####
+
+def main(checkpoint):
+    # Load configuration
     config = load_config()
 
     # Load preprocessed data for inference
-    data_path = config.get('general').get('test_data').get('data_path')
-    preprocessed_data = preprocess(data_path)
+    test_data_path = config.get('general').get('test_data').get('data_path')
+    test_data = pd.read_csv(test_data_path)
+    preprocessed_data = preprocess(test_data)
 
-    # Convert data to DataLoader format
-    test_list = to_list(preprocessed_data)
+    window_size = config.get('inference').get('window_size')
+    step = config.get('inference').get('step')
+
+    test_list = to_list(preprocessed_data, window_size, config, step)
     test_dataset = ChildInstituteDataset(test_list)
 
-    BATCH_SIZE = config.get('inference').get('batch_size')
-    test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
-
-    # Perform inference
-    submission = inference(model_path = checkpoint, test_dataloader=test_dataloader)
-
+    batch_size = config.get('inference').get('batch_size')
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    
+    inference(model_path=checkpoint, test_dataloader=test_dataloader)
