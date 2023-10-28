@@ -1,3 +1,4 @@
+import argparse
 import copy
 import pandas as pd
 import torch
@@ -10,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from dataloader import ChildInstituteDataset, preprocess, to_list
 from models.cnn import CNN
-from util import load_config, make_logdir, update_config_from_args
+from utils import load_config, make_logdir, update_config_from_args
 
 
 def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
@@ -27,10 +28,11 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
     Returns:
     - nn.Module: The model based on lowest valid loss.
     """
+    save_path = config.get('general').get('save_path')
+
     criterion = config.get('train').get('criterion')
     optimizer = config.get('train').get('optimizer')
     num_epochs = config.get('train').get('epochs')
-    save_path = config.get('train').get('save_path')
     scheduler_class = config.get('train').get('scheduler_class', torch.optim.lr_scheduler.StepLR)
     scheduler_params = config.get('train').get('scheduler_params', {'step_size': 10, 'gamma': 0.1})
 
@@ -61,16 +63,20 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
             loss.backward()
             optimizer.step()
             training_loss += loss.item()
+
+            ## accuracy 추가
+            _, preds = torch.max(outputs, 1)
+            train_corrects += torch.sum(preds == labels.data)
+            train_total_samples += inputs.size(0)
         avg_train_loss = training_loss / len(train_dataloader)
         train_losses.append(avg_train_loss)
-        print(f"Epoch {epoch + 1}/{num_epochs}, Training Loss: {avg_train_loss}")
+        
+        train_accuracy = train_corrects.double() / train_total_samples
+        print(f"Epoch {epoch + 1}/{num_epochs},"
+              f"Training Loss: {avg_train_loss},"
+              f"Training Accuracy: {train_accuracy}")
         writer.add_scalar('Loss/train', avg_train_loss, epoch)
-
-        # ReduceLROnPlateau를 사용하지 않는 경우 lr 업데이트 & 로깅
-        if not isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
-            scheduler.step()
-            current_lr = scheduler.get_last_lr()[0]
-            writer.add_scalar('Learning Rate', current_lr, epoch)
+        writer.add_scalar('Accuracy/train', train_accuracy, epoch)
 
         # Validation phase
         model.eval()
@@ -81,16 +87,34 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
                 outputs = model(inputs)
                 loss = criterion(outputs, labels)
                 valid_loss += loss.item()
+
+                ## accuracy 추가
+                _, preds = torch.max(outputs, 1)
+                valid_corrects += torch.sum(preds == labels.data)
+                valid_total_samples += inputs.size(0)
+
         avg_valid_loss = valid_loss / len(valid_dataloader)
         valid_losses.append(avg_valid_loss)
-        print(f"Epoch {epoch + 1}/{num_epochs}, Validation Loss: {avg_valid_loss}")
-        writer.add_scalar('Loss/valid', avg_valid_loss, epoch)
 
-        # ReduceLROnPlateau를 사용하는 경우 lr 업데이트 & 로깅
+        valid_accuracy = valid_corrects.double() / valid_total_samples
+
+        print(f"Epoch {epoch + 1}/{num_epochs},"
+              f"Validation Loss: {avg_valid_loss},"
+              f"Validation accuracy: {valid_accuracy}")
+        writer.add_scalar('Loss/valid', avg_valid_loss, epoch)
+        writer.add_scalar('Accuracy/valid', valid_accuracy, epoch)
+
+
+
+        # ReduceLROnPlateau를 사용하지 않는 경우 lr 업데이트 & 로깅
         if isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
             scheduler.step(valid_loss / len(valid_dataloader))
-            current_lr = scheduler.optimizer.param_groups[0]['lr']
-            writer.add_scalar('Learning Rate', current_lr, epoch)
+        else:
+            scheduler.step()
+
+        current_lr = getattr(scheduler, 'get_last_lr', 
+                             lambda: [scheduler.optimizer.param_groups[0]['lr']])()[0]
+        writer.add_scalar('lr logging', current_lr, epoch)
 
         # Save the best model
         if valid_loss < best_loss:
@@ -103,13 +127,16 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
     return scripted_model
 
 def main(exp_name):
+    ## parsing은 script에서 수행
+
     #### config load ####
     config = load_config()
     # Update exp_name args to 'general' config
     config = update_config_from_args(config, exp_name)
-
+    config_path = config.get('general').get('tensorboard').get('path')
+    
     # Tensorboard
-    log_dir = make_logdir("runs", exp_name)
+    log_dir = make_logdir("tensorboard", config_path)
     writer = SummaryWriter(log_dir=log_dir)
 
     ## train data merge

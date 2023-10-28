@@ -1,12 +1,10 @@
 import os
 import yaml
 import argparse
+import glob
 
 def load_config(config_dir='configs'):
-    config_files = ['general_config.yaml',
-                    'model_config.yaml',
-                    'train_config.yaml',
-                    'inference_config.yaml']
+    config_files = glob.glob('*_config.yaml')
     config = {}
 
     for config_file in config_files:
@@ -36,9 +34,6 @@ def make_logdir(base_dir: str, exp_name: str) -> str:
 
 def update_config_from_args(config, args):
     """Update the 'general' key of the config dict based on command line arguments"""
-    parser = argparse.ArgumentParser()
-    args = parser.parse_args(args)
     args_dict = vars(args)
     config['general'].update(args_dict)
-    
     return config
