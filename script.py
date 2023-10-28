@@ -12,7 +12,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run train or inference scripts."
     )
-    parser.add_argument("action", choices=["train", "inference"])
+    parser.add_argument("task", choices=["train", "inference"])
     parser.add_argument("--exp_name", type=str)
     parser.add_argument("--checkpoint", type=str)
 
