@@ -24,9 +24,7 @@ class ChildInstituteDataset(Dataset):
 
 
 def preprocess(data, key: Union[str, List[str]] = 'series_id', **kwargs) -> pd.DataFrame:
-    data['event'] = data.groupby(key)['event'].shift(1)
-    data.dropna(inplace=True)
-
+        
     return data
 
 
@@ -45,6 +43,3 @@ def to_list(data, window_size: int, config: Dict[str, str], step: int = 1, key: 
     slided_window = np.array([np.lib.stride_tricks.sliding_window_view(datum, window_size, axis=0)[::step] for datum in data])
 
     return np.concatenate(slided_window).swapaxes(2, 1)
-
-    return preprocessed_data
-
