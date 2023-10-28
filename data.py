@@ -1,6 +1,6 @@
 from typing import Union, Dict, List
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from sklearn import preprocessing
 import pandas as pd
 import numpy as np
@@ -15,17 +15,16 @@ class ChildInstituteDataset(Dataset):
 
     def __getitem__(self, idx):
         return {
-            'X': torch.from_numpy(self.data[idx][:, 3:]),
-            'y': torch.from_numpy(self.data[idx][:, 2][:1]),
-            'step': torch.from_numpy(self.data[idx][:, 1][-1:]),
-            'series_id': torch.from_numpy(self.data[idx][:, 1][:1]),
+            'X': torch.from_numpy(self.data[idx][:, 4:].astype(np.float32)),
+            'y': torch.from_numpy(self.data[idx][:, 3][-1:].astype(np.float32)),
+            'series_id': torch.from_numpy(self.data[idx][:, 0][:1].astype(np.int32)),
+            'date': self.data[idx][:, 1][-1:],
+            'step': torch.from_numpy(self.data[idx][:, 2][-1:][-1:].astype(np.int32)),
         }
 
 
 def preprocess(data, key: Union[str, List[str]] = 'series_id', **kwargs) -> pd.DataFrame:
-    data['event'] = data.groupby(key)['event'].shift(1)
-    data.dropna(inplace=True)
-
+        
     return data
 
 
@@ -44,6 +43,3 @@ def to_list(data, window_size: int, config: Dict[str, str], step: int = 1, key: 
     slided_window = np.array([np.lib.stride_tricks.sliding_window_view(datum, window_size, axis=0)[::step] for datum in data])
 
     return np.concatenate(slided_window).swapaxes(2, 1)
-
-    return preprocessed_data
-
