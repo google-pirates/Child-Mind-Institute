@@ -1,6 +1,6 @@
 from typing import Union, Dict, List
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from sklearn import preprocessing
 import pandas as pd
 import numpy as np
