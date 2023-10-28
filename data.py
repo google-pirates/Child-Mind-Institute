@@ -15,10 +15,11 @@ class ChildInstituteDataset(Dataset):
 
     def __getitem__(self, idx):
         return {
-            'X': torch.from_numpy(self.data[idx][:, 3:]),
-            'y': torch.from_numpy(self.data[idx][:, 2][:1]),
-            'step': torch.from_numpy(self.data[idx][:, 1][-1:]),
-            'series_id': torch.from_numpy(self.data[idx][:, 1][:1]),
+            'X': torch.from_numpy(self.data[idx][:, 4:].astype(np.float32)),
+            'y': torch.from_numpy(self.data[idx][:, 3][-1:].astype(np.float32)),
+            'series_id': torch.from_numpy(self.data[idx][:, 0][:1].astype(np.int32)),
+            'date': self.data[idx][:, 1][-1:],
+            'step': torch.from_numpy(self.data[idx][:, 2][-1:][-1:].astype(np.int32)),
         }
 
 
