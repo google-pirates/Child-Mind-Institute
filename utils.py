@@ -1,16 +1,16 @@
 import os
-import yaml
-import argparse
 import glob
+import yaml
 
 def load_config(config_dir='configs'):
-    config_files = glob.glob('*_config.yaml')
+    script_dir = os.path.dirname(__file__)
+    config_dir = os.path.join(script_dir, config_dir)
+    config_files = glob.glob(os.path.join(config_dir, '*_config.yaml'))
+    
     config = {}
-
     for config_file in config_files:
-        file_path = os.path.join(config_dir, config_file)
-        if os.path.exists(file_path):
-            with open(file_path, 'r') as f:
+        if os.path.exists(config_file):
+            with open(config_file, 'r') as f:
                 loaded_config = yaml.safe_load(f)
                 if loaded_config:
                     config.update(loaded_config)
