@@ -44,7 +44,7 @@ def inference(model_path: str, test_dataloader: DataLoader):
             _, preds = torch.max(probabilities, 1)
 
             # 3 events, none, onset and wakeup
-            event_mapping = {0: "", 1: "onset", 2: "wakeup"}
+            event_mapping = {0: "onset", 1: "wakeup"}
             events = [event_mapping[pred] for pred in preds.cpu().numpy()]
 
             # Scoring using logit values
