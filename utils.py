@@ -2,18 +2,17 @@ import os
 import glob
 import yaml
 
-def load_config(config_dir='./configs'):
+def load_config(config_dir='/configs'):
     config_files = glob.glob('*.yaml')
     config = {}
 
     for config_file in config_files:
-        if os.path.exists(config_file):
-            with open(config_file, 'r') as f:
+        file_path = os.path.join(config_dir, config_file)
+        if os.path.exists(file_path):
+            with open(file_path, 'r') as f:
                 loaded_config = yaml.safe_load(f)
                 if loaded_config:
                     config.update(loaded_config)
-
-    return config
 
 def make_logdir(base_dir: str, exp_name: str) -> str:
     """Return a unique log directory within a subfolder named after the experiment"""
