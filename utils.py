@@ -13,6 +13,8 @@ def load_config(config_dir='./configs'):
                 loaded_config = yaml.safe_load(f)
                 if loaded_config:
                     config.update(loaded_config)
+    
+    return config
 
 def make_logdir(base_dir: str, exp_name: str) -> str:
     """Return a unique log directory within a subfolder named after the experiment"""
