@@ -13,7 +13,6 @@ def load_config(config_dir='./configs'):
                 loaded_config = yaml.safe_load(f)
                 if loaded_config:
                     config.update(loaded_config)
-    
     return config
 
 def make_logdir(base_dir: str, exp_name: str) -> str:
@@ -32,7 +31,8 @@ def make_logdir(base_dir: str, exp_name: str) -> str:
     return log_dir
 
 def update_config_from_args(config, args):
-    """Update the 'general' key of the config dict based on command line arguments"""
     args_dict = vars(args)
-    config['general'].update(args_dict)
+    for key, value in args_dict.items():
+        if value is not None: ## 입력된 args 값이 None 이라면 config에 업데이트 하지 않음.
+            config['general'][key] = value
     return config
