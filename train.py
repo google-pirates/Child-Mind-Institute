@@ -1,3 +1,4 @@
+# pylint: disable=no-member
 import copy
 import pandas as pd
 import torch
@@ -131,20 +132,20 @@ def main(exp_name):
     config = load_config()
     # Update exp_name args to 'general' config
     config = update_config_from_args(config, exp_name)
-    config_path = config.get('general').get('tensorboard').get('path')
+    tensorboard_path = config.get('general').get('tensorboard').get('path')
 
     # Tensorboard
-    log_dir = make_logdir("tensorboard", config_path)
+    log_dir = make_logdir("tensorboard", tensorboard_path)
     writer = SummaryWriter(log_dir=log_dir)
 
     ## train data merge
-    data_path = config.get('general').get('data').get('data_path')
+    data_path = config.get('general').get('data').get('save_path')
 
     merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet
 
     preprocessed_data = preprocess(merged_train_data)
 
-    window_size = config.get('train').get('window_size')
+    window_size = int(config.get('train').get('window_size'))
     step = config.get('train').get('step')
 
     train_list = to_list(preprocessed_data, window_size, config, step)

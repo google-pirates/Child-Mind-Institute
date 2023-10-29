@@ -3,11 +3,11 @@ import glob
 import yaml
 
 def load_config(config_dir='./configs'):
-    config_files = glob.glob('*.yaml')
+    config_files = glob.glob(os.path.join(config_dir, '*.yaml'))
     config = {}
 
     for config_file in config_files:
-        file_path = os.path.join(config_dir, config_file)
+        file_path = config_file
         if os.path.exists(file_path):
             with open(file_path, 'r') as f:
                 loaded_config = yaml.safe_load(f)
@@ -31,8 +31,8 @@ def make_logdir(base_dir: str, exp_name: str) -> str:
     return log_dir
 
 def update_config_from_args(config, args):
-    args_dict = vars(args)
-    for key, value in args_dict.items():
-        if value is not None: ## 입력된 args 값이 None 이라면 config에 업데이트 하지 않음.
-            config['general'][key] = value
+    if hasattr(args, 'exp_name') and args.exp_name is not None:
+        config['general']['exp_name'] = args.exp_name
+    if hasattr(args, 'checkpoint') and args.checkpoint is not None:
+        config['general']['checkpoint'] = args.checkpoint
     return config

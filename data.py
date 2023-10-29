@@ -1,3 +1,4 @@
+# pylint: disable=no-member
 from typing import Union, Dict, List
 import torch
 from torch.utils.data import Dataset
@@ -40,6 +41,9 @@ def to_list(data, window_size: int, config: Dict[str, str], step: int = 1, key: 
     data = [datum[1] for datum in data.groupby(key)]
     for datum in data:
         scale(datum, config)
-    slided_window = np.array([np.lib.stride_tricks.sliding_window_view(datum, window_size, axis=0)[::step] for datum in data])
+
+    ## dtype=object 
+    slided_window = np.array([np.lib.stride_tricks.sliding_window_view(datum, window_size, axis=0)[::step] 
+                              for datum in data], dtype=object)
 
     return np.concatenate(slided_window).swapaxes(2, 1)
