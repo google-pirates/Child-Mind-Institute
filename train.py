@@ -134,7 +134,7 @@ def main(exp_name):
     # Update exp_name args to 'general' config
     config = update_config_from_args(config, exp_name)
     config_path = config.get('general').get('tensorboard').get('path')
-    
+
     # Tensorboard
     log_dir = make_logdir("tensorboard", config_path)
     writer = SummaryWriter(log_dir=log_dir)
@@ -142,7 +142,7 @@ def main(exp_name):
     ## train data merge
     data_path = config.get('general').get('data').get('data_path')
 
-    merged_train_data = pd.read_csv(data_path) ## merge한 파일의 형식에 따라 수정 필요
+    merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet
 
     preprocessed_data = preprocess(merged_train_data)
 
