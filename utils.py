@@ -2,7 +2,7 @@ import os
 import glob
 import yaml
 
-def load_config(config_dir='/configs'):
+def load_config(config_dir='./configs'):
     config_files = glob.glob('*.yaml')
     config = {}
 
