@@ -4,3 +4,6 @@ __pycache__/train.cpython-310.pyc
 __pycache__/utils.cpython-310.pyc
 datas/merged_data.parquet
 models/__pycache__/cnn.cpython-310.pyc
+datas/testing.parquet
+tensorboard/
+models/__pycache__/lstm.cpython-310.pyc

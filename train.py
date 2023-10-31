@@ -4,12 +4,14 @@ import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
 from torch import nn, optim
-from torch.optim.lr_scheduler import *
+import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+import importlib
+import os
+from tqdm import tqdm
 
 from data import ChildInstituteDataset, preprocess, to_list
-from models.cnn import CNN
 from utils import load_config, make_logdir, update_config_from_args
 
 
@@ -27,14 +29,39 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
     Returns:
     - nn.Module: The model based on lowest valid loss.
     """
-    save_path = config.get('general').get('save_path')
+    model_save_dir = os.path.join(writer.log_dir, 'saved_models') 
+    if not os.path.exists(model_save_dir):
+        os.makedirs(model_save_dir)
+    model_save_path = os.path.join(model_save_dir, 'best_model.pth')
 
-    criterion = config.get('train').get('criterion')
-    optimizer = config.get('train').get('optimizer')
+    optimizer_name = config.get('train').get('optimizer')
     num_epochs = config.get('train').get('epochs')
-    scheduler_class = config.get('train').get('scheduler_class', torch.optim.lr_scheduler.StepLR)
-    scheduler_params = config.get('train').get('scheduler_params', {'step_size': 10, 'gamma': 0.1})
+    lr = config.get('train').get('learning_rate')
 
+    ## Set Criterion
+    criterion_config = config.get('train').get('criterion', {})
+    criterion_name = criterion_config.get('name')
+    criterion_params = criterion_config.get('params', {})
+    criterion_class = getattr(nn, criterion_name, None)
+    if criterion_class is None:
+        raise ValueError(f"Criterion {criterion_name} not found in torch.nn")
+
+    criterion = criterion_class(**criterion_params)
+
+    ## Set Optimizer
+    optimizer_class = getattr(optim, optimizer_name, None)
+    if optimizer_class is None:
+        raise ValueError(f"Optimizer {optimizer_name} not found in torch.optim")
+
+    optimizer = optimizer_class(model.parameters(), lr=lr)
+
+    ## Set scheduler
+    scheduler_name = config.get('train').get('scheduler', 'StepLR')
+    scheduler_params = config.get('train').get('scheduler_params', {'step_size': 10, 'gamma': 0.1})
+    scheduler_class = getattr(lr_scheduler, scheduler_name, None)
+    if scheduler_class is None:
+        raise ValueError(f"Scheduler {scheduler_name} not found in torch.optim.lr_scheduler")
+    scheduler = scheduler_class(optimizer, **scheduler_params)
     if scheduler_params is None:
         scheduler_params = {'step_size': 10, 'gamma': 0.1} ## need to refactoring
 
@@ -44,66 +71,78 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
     best_model = None
     best_loss = float("inf")
 
-    scheduler = scheduler_class(optimizer, **scheduler_params)
-
     # for tensorboard logging
     train_losses = []
     valid_losses = []
 
-    for epoch in range(num_epochs):
+    for epoch in tqdm(range(num_epochs)):
         # Training phase
         model.train()
         training_loss = 0.0
-        for inputs, labels in train_dataloader:
+        train_corrects = 0
+        train_total_samples = 0
+        for batch in train_dataloader:
+            ## data에서 X, y 정의
+            inputs = batch['X']
+            labels = batch['y']
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
-            outputs = model(inputs)
+            outputs = model({'X': inputs, 'y': labels}) # [batch_size, 1]
+            # outputs = outputs.squeeze()  # [batch_size, 1] -> [batch_size]
+            # labels = labels.squeeze()
+
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
             training_loss += loss.item()
 
             ## accuracy 추가
-            _, preds = torch.max(outputs, 1)
-            train_corrects += torch.sum(preds == labels.data)
+            probabilities = torch.sigmoid(outputs)
+            predictions = (probabilities > 0.5).float()
+            train_corrects += torch.sum(predictions == labels)
             train_total_samples += inputs.size(0)
         avg_train_loss = training_loss / len(train_dataloader)
         train_losses.append(avg_train_loss)
-        
         train_accuracy = train_corrects.double() / train_total_samples
         print(f"Epoch {epoch + 1}/{num_epochs},"
-              f"Training Loss: {avg_train_loss},"
-              f"Training Accuracy: {train_accuracy}")
+              f"Training Loss: {avg_train_loss:.02f},"
+              f"Training Accuracy: {train_accuracy:.02f}")
         writer.add_scalar('Loss/train', avg_train_loss, epoch)
         writer.add_scalar('Accuracy/train', train_accuracy, epoch)
 
         # Validation phase
         model.eval()
         valid_loss = 0.0
+        valid_corrects = 0
+        valid_total_samples = 0
         with torch.no_grad():
-            for inputs, labels in valid_dataloader:
+            for batch in valid_dataloader:
+                ## data에서 X, y 정의
+                inputs = batch['X']
+                labels = batch['y']
                 inputs, labels = inputs.to(device), labels.to(device)
-                outputs = model(inputs)
+                outputs = model({'X': inputs, 'y': labels}) # [batch_size, 1]
+                # outputs = outputs.squeeze()  # [batch_size, 1] -> [batch_size]
+                # labels = labels.squeeze()
+
                 loss = criterion(outputs, labels)
                 valid_loss += loss.item()
 
                 ## accuracy 추가
-                _, preds = torch.max(outputs, 1)
-                valid_corrects += torch.sum(preds == labels.data)
+                probabilities = torch.sigmoid(outputs)
+                predictions = (probabilities > 0.5).float()
+                valid_corrects += torch.sum(predictions == labels)
                 valid_total_samples += inputs.size(0)
-
         avg_valid_loss = valid_loss / len(valid_dataloader)
         valid_losses.append(avg_valid_loss)
 
         valid_accuracy = valid_corrects.double() / valid_total_samples
 
         print(f"Epoch {epoch + 1}/{num_epochs},"
-              f"Validation Loss: {avg_valid_loss},"
-              f"Validation accuracy: {valid_accuracy}")
+              f"Validation Loss: {avg_valid_loss:.02f},"
+              f"Validation accuracy: {valid_accuracy:.02f}")
         writer.add_scalar('Loss/valid', avg_valid_loss, epoch)
         writer.add_scalar('Accuracy/valid', valid_accuracy, epoch)
-
-
 
         # ReduceLROnPlateau를 사용하지 않는 경우 lr 업데이트 & 로깅
         if isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
@@ -120,8 +159,8 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
             best_loss = valid_loss
             best_model = copy.deepcopy(model).cpu()
             scripted_model = torch.jit.script(best_model)
-            torch.jit.save(scripted_model, save_path)
-            print(f"Best model saved to {save_path}")
+            torch.jit.save(scripted_model, model_save_path)
+            print(f"Best model saved to {model_save_path}")
 
     return scripted_model
 
@@ -130,12 +169,13 @@ def main(exp_name):
 
     #### config load ####
     config = load_config()
+
     # Update exp_name args to 'general' config
     config = update_config_from_args(config, exp_name)
     tensorboard_path = config.get('general').get('tensorboard').get('path')
 
     # Tensorboard
-    log_dir = make_logdir("tensorboard", tensorboard_path)
+    log_dir = make_logdir(tensorboard_path, exp_name)
     writer = SummaryWriter(log_dir=log_dir)
 
     ## train data merge
@@ -172,10 +212,20 @@ def main(exp_name):
     train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=train_data_shuffle)
     valid_dataloader = DataLoader(valid_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-    #### train ###
+
+    example_batch = next(iter(train_dataloader))
+    print(example_batch['X'].shape)
+    _, seq_len, n_features = example_batch['X'].shape
+
+    print(f'seq_len: {seq_len}, n_features: {n_features}')
+
+    ### train ###
     model_name = config.get('train').get('model')
-    model_class = getattr(nn, model_name)
-    model = model_class(config)
+    module_path = config.get('train').get('module')
+    model_module = importlib.import_module(module_path)
+
+    model_class = getattr(model_module, model_name)
+    model = model_class(config, n_features=n_features, seq_len=seq_len)
 
     trained_model = train(config=config, model=model,
                           train_dataloader=train_dataloader,

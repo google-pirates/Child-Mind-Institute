@@ -5,7 +5,7 @@ from torch.utils.data import Dataset
 from sklearn import preprocessing
 import pandas as pd
 import numpy as np
-
+import pyarrow as pa
 
 class ChildInstituteDataset(Dataset):
     def __init__(self, data):
@@ -19,7 +19,7 @@ class ChildInstituteDataset(Dataset):
             'X': torch.from_numpy(self.data[idx][:, 4:].astype(np.float32)),
             'y': torch.from_numpy(self.data[idx][:, 3][-1:].astype(np.float32)),
             'series_id': torch.from_numpy(self.data[idx][:, 0][:1].astype(np.int32)),
-            'date': self.data[idx][:, 1][-1:],
+            'date': str(self.data[idx][:, 1][-1:]), ## dataloader 객체는 datetime 타입 처리 불가
             'step': torch.from_numpy(self.data[idx][:, 2][-1:][-1:].astype(np.int32)),
         }
 

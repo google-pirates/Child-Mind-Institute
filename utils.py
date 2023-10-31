@@ -17,7 +17,8 @@ def load_config(config_dir='./configs'):
 
 def make_logdir(base_dir: str, exp_name: str) -> str:
     """Return a unique log directory within a subfolder named after the experiment"""
-    exp_dir = os.path.join(base_dir, exp_name)
+    safe_exp_name = exp_name.replace(":", "_")
+    exp_dir = os.path.join(base_dir, safe_exp_name)
     if not os.path.exists(exp_dir):
         os.makedirs(exp_dir)
 
