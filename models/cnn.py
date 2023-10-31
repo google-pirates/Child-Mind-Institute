@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, List
 from math import floor
 import torch
 import torch.nn as nn
@@ -8,9 +8,9 @@ class CNN(nn.Module):
     def __init__(self, config: Dict[str, Any], **kwargs):
         super(CNN, self).__init__()
         self.model_config = config.get('model').get('cnn')
+        self.batch_size = config.get('train').get('batch_size')
         self.n_features = config.get('train').get('n_features')
         self.seq_len = config.get('train').get('seq_len')
-        self.batch_size = config.get('train').get('batch_size')
 
         self.activation = self.model_config.get('activation')
         self.normalization_layer = self.model_config.get('normalization_layer')
@@ -43,7 +43,7 @@ class CNN(nn.Module):
         ## CNN Layers
         in_feature = self.n_features
         seq_len = self.seq_len
-        self.cnn_blocks = []
+        self.cnn_blocks = nn.ModuleList()  ## torchscript의 scripting을 위해 추가.
         for (
             out_feature,
             kernel_size,
@@ -91,7 +91,7 @@ class CNN(nn.Module):
 
         ## FC Layers
         fc_input = self.out_features[-1]*seq_len
-        fc_layers = []
+        fc_layers = nn.ModuleList() ## for TorchScript
         for (
             i, (fc_output, fc_dropout_rate)
         ) in enumerate(
@@ -121,11 +121,17 @@ class CNN(nn.Module):
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
         x = batch.get('X')
+        
+        if x is None:
+            raise ValueError("Input 'X' is not found in the batch") ## TorchScript에서 Optional[Tensor] 를 트래킹하기 위함
+        
         x = x.permute(0, 2, 1)
         for block in self.cnn_blocks:
             x = block(x)
 
-        x = x.reshape(self.batch_size, -1)
+        # x = x.reshape(self.batch_size, -1)
+        ## 마지막 배치의 경우 입력한 batch size 보다 작을 수 있음.
+        x = x.reshape(x.size(0), -1)
         x = self.fc_layers(x)
 
         return x

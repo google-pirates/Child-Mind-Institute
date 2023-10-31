@@ -9,8 +9,8 @@ class ResBlock(nn.Module):
 
         self.model_config = config.get('model').get('tsmixer')
         self.n_features = config.get('train').get('n_features')
-
-        self.norm_type = self.model_config.get('normalization_layer')
+        self.seq_len = config.get('train').get('seq_len')
+        self.norm_type = self.model_config.get('normalization')
         self.dropout_rates = self.model_config.get('dropout_rates')
         self.ff_dim = self.model_config.get('ff_dim')
         self.activation_name = self.model_config.get('activation')
@@ -23,7 +23,7 @@ class ResBlock(nn.Module):
 
         # Temporal Linear
         self.temporal_norm = self.norm
-        self.temporal_linear = nn.Linear(self.n_features, self.n_features)
+        self.temporal_linear = nn.Linear(self.seq_len, self.seq_len)
         self.temporal_dropout = nn.Dropout(self.dropout_rates)
 
         # Feature Linear
@@ -81,14 +81,18 @@ class TSMixer(nn.Module):
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
         x = batch.get('X')  # batch, seq_len, n_features
+        if x is None:
+            raise ValueError("Input 'X' is not found in the batch") ## TorchScript에서 Optional[Tensor] 를 트래킹하기 위함
+
         for block in self.blocks:
             x = block(x)
-
-        if self.target_slice:
+        
+        if self.target_slice is not None:
             x = x[:, :, self.target_slice]
 
-        x_transposed = x.transpose(1, 2)  # batch, n_features, seq_len
-        x_out = self.final_dense(x_transposed)
-        x_out = x_out.transpose(1, 2)  # batch, seq_len, n_features
-        return x_out
+        # x_transposed = x.transpose(1, 2)  # batch, n_features, seq_len
+        # x_out = self.final_dense(x_transposed)
+        # x_out = x_out.transpose(1, 2)  # batch, seq_len, n_features
+        x_selected = x[:, -1, :] ## 마지막 시간 단계를 이용하여 출력 생성
+        return self.final_dense(x_selected)
     

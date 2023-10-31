@@ -12,18 +12,18 @@ model:
     fc_outputs: [50, 1]
     fc_dropout_rates: [0.4, 0.4]
   lstm:
-    out_features: [100, 80, 60, 40]
+    out_features: [50, 20]
     normalization: 'LayerNorm'
     bidirectional: True
     activation: 'ReLU'
-    dropout_rates: [0.4]
-    fc_outputs: [50, 100, 1]
+    dropout_rates: [0.4, 0.4]
+    fc_outputs: [40, 1]
     fc_dropout_rates: [0.4, 0.4]
   tsmixer:
-    out_seq_len: 50
-    n_block: 4
-    target_slice: None
+    out_seq_len: 1
+    n_block: 10
+    # target_slice: None
     normalization: 'LayerNorm'
     dropout_rates: 0.4
-    ff_dim: 4
+    ff_dim: 10
     activation: 'ReLU'

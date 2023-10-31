@@ -30,7 +30,7 @@ class LSTM(nn.Module):
         ## CNN Layers
         in_feature = self.n_features
         seq_len = self.seq_len
-        self.lstm_blocks = []
+        self.lstm_blocks = nn.ModuleList() ## for TorchScript
         for (
             out_feature,
             dropout_rate,
@@ -93,13 +93,18 @@ class LSTM(nn.Module):
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
         x = batch.get('X')
+        if x is None:
+            raise ValueError("Input 'X' is not found in the batch") ## TorchScript에서 Optional[Tensor] 를 트래킹하기 위함
+
         for block in self.lstm_blocks:
             x = block(x)
 
-            if isinstance(block, nn.RNNBase):
-                x, _ = x
+            if isinstance(x, tuple):
+                x, _ = x 
 
-        x = x.reshape(self.batch_size, -1)
+        # x = x.reshape(self.batch_size, -1)
+        x = x.reshape(x.size(0), -1)
         x = self.fc_layers(x)
 
         return x
+

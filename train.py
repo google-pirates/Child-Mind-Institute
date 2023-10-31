@@ -105,8 +105,8 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
         train_losses.append(avg_train_loss)
         train_accuracy = train_corrects.double() / train_total_samples
         print(f"Epoch {epoch + 1}/{num_epochs},"
-              f"Training Loss: {avg_train_loss:.02f},"
-              f"Training Accuracy: {train_accuracy:.02f}")
+              f"Training Loss: {avg_train_loss:.04f},"
+              f"Training Accuracy: {train_accuracy:.04f}")
         writer.add_scalar('Loss/train', avg_train_loss, epoch)
         writer.add_scalar('Accuracy/train', train_accuracy, epoch)
 
@@ -139,8 +139,8 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
         valid_accuracy = valid_corrects.double() / valid_total_samples
 
         print(f"Epoch {epoch + 1}/{num_epochs},"
-              f"Validation Loss: {avg_valid_loss:.02f},"
-              f"Validation accuracy: {valid_accuracy:.02f}")
+              f"Validation Loss: {avg_valid_loss:.04f},"
+              f"Validation accuracy: {valid_accuracy:.04f}")
         writer.add_scalar('Loss/valid', avg_valid_loss, epoch)
         writer.add_scalar('Accuracy/valid', valid_accuracy, epoch)
 
@@ -190,8 +190,8 @@ def main(exp_name):
 
     train_list = to_list(preprocessed_data, window_size, config, step)
 
-    train_data_list = []
-    valid_data_list = []
+    # train_data_list = []
+    # valid_data_list = []
 
     ## train,test split 시 series_id 별로 split 할지,
     ## 전체 데이터에 대해 split할지 결정 필요
@@ -199,10 +199,12 @@ def main(exp_name):
     ## define valid size from config. default = 0.2
     valid_set_size = config.get('train').get('valid_size', 0.2)
 
-    for df in train_list:
-        train_df, valid_df = train_test_split(df, test_size=valid_set_size, shuffle=False)
-        train_data_list.append(train_df)
-        valid_data_list.append(valid_df)
+    # for df in train_list:
+    #     train_df, valid_df = train_test_split(df, test_size=valid_set_size, shuffle=False)
+    #     train_data_list.append(train_df)
+    #     valid_data_list.append(valid_df)
+
+    train_data_list, valid_data_list = train_test_split(train_list, test_size=valid_set_size, shuffle=False)
 
     train_dataset = ChildInstituteDataset(train_data_list)
     valid_dataset = ChildInstituteDataset(valid_data_list)
@@ -214,10 +216,8 @@ def main(exp_name):
 
 
     example_batch = next(iter(train_dataloader))
-    print(example_batch['X'].shape)
     _, seq_len, n_features = example_batch['X'].shape
-
-    print(f'seq_len: {seq_len}, n_features: {n_features}')
+    config['train'].update({'seq_len': seq_len, 'n_features': n_features})
 
     ### train ###
     model_name = config.get('train').get('model')
@@ -225,7 +225,7 @@ def main(exp_name):
     model_module = importlib.import_module(module_path)
 
     model_class = getattr(model_module, model_name)
-    model = model_class(config, n_features=n_features, seq_len=seq_len)
+    model = model_class(config)
 
     trained_model = train(config=config, model=model,
                           train_dataloader=train_dataloader,

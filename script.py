@@ -3,6 +3,9 @@ import argparse
 import inference
 import train
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 if __name__ == "__main__":
     """
     Usage:

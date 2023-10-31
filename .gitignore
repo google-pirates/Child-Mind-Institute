@@ -7,3 +7,6 @@ models/__pycache__/cnn.cpython-310.pyc
 datas/testing.parquet
 tensorboard/
 models/__pycache__/lstm.cpython-310.pyc
+models/__pycache__/tsmixer.cpython-310.pyc
+test.ipynb
+data_eda.ipynb
