@@ -30,10 +30,3 @@ def make_logdir(base_dir: str, exp_name: str) -> str:
 
     os.makedirs(log_dir)
     return log_dir
-
-def update_config_from_args(config, args):
-    if hasattr(args, 'exp_name') and args.exp_name is not None:
-        config['general']['exp_name'] = args.exp_name
-    if hasattr(args, 'checkpoint') and args.checkpoint is not None:
-        config['general']['checkpoint'] = args.checkpoint
-    return config
