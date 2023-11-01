@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import os
 from tqdm import tqdm
+import nni
 
 from data import ChildInstituteDataset, preprocess, to_list
 from utils import make_logdir
@@ -147,6 +148,8 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
         writer.add_scalar('Loss/valid', avg_valid_loss, epoch)
         writer.add_scalar('Accuracy/valid', valid_accuracy, epoch)
 
+        nni.report_intermediate_result(valid_accuracy)
+
         # ReduceLROnPlateau를 사용하지 않는 경우 lr 업데이트 & 로깅
         if isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
             scheduler.step(valid_loss / len(valid_dataloader))
@@ -164,6 +167,8 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
             scripted_model = torch.jit.script(best_model)
             torch.jit.save(scripted_model, model_save_path)
             print(f"Best model saved to {model_save_path}")
+
+    nni.report_final_result(valid_accuracy)
 
     return scripted_model
 
