@@ -2,6 +2,7 @@ import models
 
 import copy
 import pandas as pd
+import pickle
 import torch
 from sklearn.model_selection import train_test_split
 from torch import nn, optim
@@ -230,3 +231,6 @@ def main(exp_name):
                           valid_dataloader=valid_dataloader,
                           writer=writer)
     writer.close()
+
+    with open(f'./{log_dir}/configs.pickle', 'wb') as file:
+        pickle.dump(config, file)
