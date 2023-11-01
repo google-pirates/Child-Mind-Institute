@@ -231,10 +231,14 @@ def main(exp_name):
 
     model = model_class(config)
 
-    trained_model = train(config=config, model=model,
-                          train_dataloader=train_dataloader,
-                          valid_dataloader=valid_dataloader,
-                          writer=writer)
+    train(
+        config=config,
+        model=model,
+        train_dataloader=train_dataloader,
+        valid_dataloader=valid_dataloader,
+        writer=writer,
+    )
+
     writer.close()
 
     with open(f'./{log_dir}/configs.pickle', 'wb') as file:
