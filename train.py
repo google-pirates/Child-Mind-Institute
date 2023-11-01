@@ -73,6 +73,8 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
 
     best_model = None
     best_loss = float("inf")
+    patience_count = 0
+    patience = config.get('train').get('patience')
 
     # for tensorboard logging
     train_losses = []
@@ -164,6 +166,15 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
             scripted_model = torch.jit.script(best_model)
             torch.jit.save(scripted_model, model_save_path)
             print(f"Best model saved to {model_save_path}")
+
+            patience_count = 0
+
+        else:
+            patience_count += 1
+        
+        # prevent overfitting
+        if patience_count > patience:
+            break
 
     return scripted_model
 

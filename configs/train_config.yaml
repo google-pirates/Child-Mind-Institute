@@ -13,6 +13,7 @@ train:
     params:
       reduction: 'mean'
   epochs: 2
+  patience: 5
   valid_size: 0.2
   scheduler: 'StepLR'
   scheduler_params:
