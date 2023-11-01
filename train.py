@@ -2,6 +2,7 @@ import models
 
 import copy
 import pandas as pd
+import numpy as np
 import pickle
 import torch
 from sklearn.model_selection import train_test_split
@@ -11,6 +12,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import os
 from tqdm import tqdm
+from sklearn.metrics import confusion_matrix
 
 from data import ChildInstituteDataset, preprocess, to_list
 from utils import make_logdir
@@ -86,6 +88,7 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
         training_loss = 0.0
         train_corrects = 0
         train_total_samples = 0
+        train_confusion_matrix = np.zeros((2, 2), dtype=np.int64)
         for batch in tqdm(train_dataloader, desc='iter'):
             ## data에서 X, y 정의
             inputs = batch['X']
@@ -106,20 +109,33 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
             predictions = (probabilities > 0.5).float()
             train_corrects += torch.sum(predictions == labels)
             train_total_samples += inputs.size(0)
+            train_confusion_matrix += confusion_matrix(labels, predictions)
         avg_train_loss = training_loss / len(train_dataloader)
         train_losses.append(avg_train_loss)
         train_accuracy = train_corrects.double() / train_total_samples
-        print(f"Epoch {epoch + 1}/{num_epochs},"
-              f"Training Loss: {avg_train_loss:.04f},"
-              f"Training Accuracy: {train_accuracy:.04f}")
+
+        tn, fp, fn, tp = train_confusion_matrix.ravel()
+        training_recall = tp / (tp+fn)
+        training_precision = tp / (tp+fp)
+
+        print(f"[Epoch {epoch + 1}/{num_epochs}] "
+              f"Training Loss: {avg_train_loss:.04f} | "
+              f"Training Accuracy: {train_accuracy:.04f} | "
+              f"Training Recall: {training_recall:.04f} | "
+              f"Training Precision: {training_precision:.04f} | "
+              f"Training F1: {2*(training_recall*training_precision)/(training_recall+training_precision):.04f} | ")
         writer.add_scalar('Loss/train', avg_train_loss, epoch)
         writer.add_scalar('Accuracy/train', train_accuracy, epoch)
+        writer.add_scalar('Recall/train', training_recall, epoch)
+        writer.add_scalar('Precision/train', training_precision, epoch)
+        writer.add_scalar('F1/train', 2*(training_recall*training_precision)/(training_recall+training_precision), epoch)
 
         # Validation phase
         model.eval()
         valid_loss = 0.0
         valid_corrects = 0
         valid_total_samples = 0
+        valid_confusion_matrix = np.zeros((2, 2), dtype=np.int64)
         with torch.no_grad():
             for batch in valid_dataloader:
                 ## data에서 X, y 정의
@@ -138,16 +154,28 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
                 predictions = (probabilities > 0.5).float()
                 valid_corrects += torch.sum(predictions == labels)
                 valid_total_samples += inputs.size(0)
+                valid_confusion_matrix += confusion_matrix(labels, predictions)
         avg_valid_loss = valid_loss / len(valid_dataloader)
         valid_losses.append(avg_valid_loss)
 
         valid_accuracy = valid_corrects.double() / valid_total_samples
 
-        print(f"Epoch {epoch + 1}/{num_epochs},"
-              f"Validation Loss: {avg_valid_loss:.04f},"
-              f"Validation accuracy: {valid_accuracy:.04f}")
+        tn, fp, fn, tp = valid_confusion_matrix.ravel()
+        valid_recall = tp / (tp+fn)
+        valid_precision = tp / (tp+fp)
+
+        print(f"[Epoch {epoch + 1}/{num_epochs}] "
+              f"Validation Loss: {avg_valid_loss:.04f} | "
+              f"Validation Accuracy: {valid_accuracy:.04f} | "
+              f"Validation Recall: {valid_recall:.04f} | "
+              f"Validation Precision: {valid_precision:.04f} | "
+              f"Validation F1: {2*(valid_recall*valid_precision)/(valid_recall+valid_precision):.04f} | ")
+
         writer.add_scalar('Loss/valid', avg_valid_loss, epoch)
         writer.add_scalar('Accuracy/valid', valid_accuracy, epoch)
+        writer.add_scalar('Recall/valid', valid_recall, epoch)
+        writer.add_scalar('Precision/valid', valid_precision, epoch)
+        writer.add_scalar('F1/valid', 2*(valid_recall*valid_precision)/(valid_recall+valid_precision), epoch)
 
         # ReduceLROnPlateau를 사용하지 않는 경우 lr 업데이트 & 로깅
         if isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
