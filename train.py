@@ -89,7 +89,7 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
         train_corrects = 0
         train_total_samples = 0
         train_confusion_matrix = np.zeros((2, 2), dtype=np.int64)
-        for batch in tqdm(train_dataloader, desc='iter'):
+        for batch in tqdm(train_dataloader, desc='train iter'):
             ## data에서 X, y 정의
             inputs = batch['X']
             labels = batch['y']
@@ -137,7 +137,7 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
         valid_total_samples = 0
         valid_confusion_matrix = np.zeros((2, 2), dtype=np.int64)
         with torch.no_grad():
-            for batch in valid_dataloader:
+            for batch in tqdm(valid_dataloader, desc='valid iter'):
                 ## data에서 X, y 정의
                 inputs = batch['X']
                 labels = batch['y']
