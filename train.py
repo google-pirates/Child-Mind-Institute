@@ -1,4 +1,5 @@
-# pylint: disable=no-member
+import models
+
 import copy
 import pandas as pd
 import torch
@@ -7,7 +8,6 @@ from torch import nn, optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-import importlib
 import os
 from tqdm import tqdm
 
@@ -221,10 +221,8 @@ def main(exp_name):
 
     ### train ###
     model_name = config.get('train').get('model')
-    module_path = config.get('train').get('module')
-    model_module = importlib.import_module(module_path)
+    model_class = getattr(models, model_name)
 
-    model_class = getattr(model_module, model_name)
     model = model_class(config)
 
     trained_model = train(config=config, model=model,

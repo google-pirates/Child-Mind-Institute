@@ -1,6 +1,5 @@
 train:
   model: 'CNN'
-  module: 'models.cnn'
   learning_rate: 0.01
   batch_size: 32
   window_size: 5
