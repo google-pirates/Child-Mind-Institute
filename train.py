@@ -75,13 +75,13 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
     train_losses = []
     valid_losses = []
 
-    for epoch in tqdm(range(num_epochs)):
+    for epoch in tqdm(range(num_epochs), desc='epoch'):
         # Training phase
         model.train()
         training_loss = 0.0
         train_corrects = 0
         train_total_samples = 0
-        for batch in train_dataloader:
+        for batch in tqdm(train_dataloader, desc='iter'):
             ## data에서 X, y 정의
             inputs = batch['X']
             labels = batch['y']
