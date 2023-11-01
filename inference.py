@@ -69,10 +69,7 @@ def inference(model_path: str, test_dataloader: DataLoader):
     return submission
 
 
-def main(checkpoint):
-    # Load configuration
-    config = load_config()
-
+def main(config):
     # Load preprocessed data for inference
     test_data_path = config.get('general').get('test_data').get('data_path')
     test_data = pd.read_csv(test_data_path)
@@ -87,4 +84,4 @@ def main(checkpoint):
     batch_size = config.get('inference').get('batch_size')
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     
-    inference(model_path=checkpoint, test_dataloader=test_dataloader)
+    inference(model_path=config.get('general').get('checkpoint'), test_dataloader=test_dataloader)

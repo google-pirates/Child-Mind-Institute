@@ -13,7 +13,7 @@ import os
 from tqdm import tqdm
 
 from data import ChildInstituteDataset, preprocess, to_list
-from utils import load_config, make_logdir, update_config_from_args
+from utils import make_logdir
 
 
 def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
