@@ -13,7 +13,7 @@ import os
 from tqdm import tqdm
 
 from data import ChildInstituteDataset, preprocess, to_list
-from utils import load_config, make_logdir, update_config_from_args
+from utils import make_logdir
 
 
 def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
@@ -167,18 +167,13 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
 
     return scripted_model
 
-def main(exp_name):
+def main(config):
     ## parsing은 script에서 수행
 
-    #### config load ####
-    config = load_config()
-
-    # Update exp_name args to 'general' config
-    config = update_config_from_args(config, exp_name)
     tensorboard_path = config.get('general').get('tensorboard').get('path')
 
     # Tensorboard
-    log_dir = make_logdir(tensorboard_path, exp_name)
+    log_dir = make_logdir(tensorboard_path, config.get('general').get('exp_name'))
     writer = SummaryWriter(log_dir=log_dir)
 
     ## train data merge
