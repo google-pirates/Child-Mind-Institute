@@ -182,7 +182,7 @@ def main(exp_name):
     writer = SummaryWriter(log_dir=log_dir)
 
     ## train data merge
-    data_path = config.get('general').get('data').get('save_path')
+    data_path = config.get('general').get('data').get('path')
 
     merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet
 
