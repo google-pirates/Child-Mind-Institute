@@ -30,6 +30,8 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
     Returns:
     - nn.Module: The model based on lowest valid loss.
     """
+    torch.manual_seed(config.get('train').get('random_seed'))
+
     model_save_dir = os.path.join(writer.log_dir, 'saved_models') 
     if not os.path.exists(model_save_dir):
         os.makedirs(model_save_dir)
@@ -205,7 +207,10 @@ def main(exp_name):
     #     train_data_list.append(train_df)
     #     valid_data_list.append(valid_df)
 
-    train_data_list, valid_data_list = train_test_split(train_list, test_size=valid_set_size, shuffle=False)
+    train_data_list, valid_data_list = train_test_split(train_list,
+                                                        test_size=valid_set_size,
+                                                        shuffle=True,
+                                                        random_state=config.get('train').get('random_seed'))
 
     train_dataset = ChildInstituteDataset(train_data_list)
     valid_dataset = ChildInstituteDataset(valid_data_list)
