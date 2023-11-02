@@ -10,3 +10,6 @@ models/__pycache__/lstm.cpython-310.pyc
 models/__pycache__/tsmixer.cpython-310.pyc
 test.ipynb
 data_eda.ipynb
+data/merged_data.parquet
+data/testing.parquet
+models/__pycache__/__init__.cpython-310.pyc
