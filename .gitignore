@@ -13,3 +13,12 @@ data_eda.ipynb
 data/merged_data.parquet
 data/testing.parquet
 models/__pycache__/__init__.cpython-310.pyc
+submission_cnn.csv
+submission_lstm.csv
+submission.csv
+submission_tsmixer.csv
+submission2.csv
+submission3.csv
+submission4.csv
+data/test_series.parquet
+data/testing2.parquet

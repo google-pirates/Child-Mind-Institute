@@ -1,5 +1,5 @@
 train:
-  model: 'CNN'
+  model: 'LSTM'
   learning_rate: 0.01
   batch_size: 32
   window_size: 5
@@ -12,7 +12,7 @@ train:
     name: 'BCEWithLogitsLoss'
     params:
       reduction: 'mean'
-  epochs: 2
+  epochs: 10
   patience: 5
   valid_size: 0.2
   scheduler: 'StepLR'

@@ -1,12 +1,11 @@
 # pylint: disable=no-member
-import argparse
-
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
+import numpy as np
+from tqdm import tqdm
 
 from data import ChildInstituteDataset, preprocess, to_list
-from utils import load_config 
 
 
 def inference(model_path: str, test_dataloader: DataLoader):
@@ -32,31 +31,24 @@ def inference(model_path: str, test_dataloader: DataLoader):
     all_scores = []
 
     with torch.no_grad():
-        for data in test_dataloader:
-            inputs = data["data"].to(device)
-            series_id = data["series_id"]
-            event_step = data["step"]
+        for batch in tqdm(test_dataloader, desc='Inference'):
+            inputs = batch['X'].to(device)
+            series_id = batch['series_id'][-1].item()
+            step = batch['step'][-1].item()
 
-            outputs = model(inputs)
+            outputs = model({'X': inputs})
 
-            probabilities = torch.softmax(outputs, dim=1)
+            probabilities = torch.sigmoid(outputs)
+            prediction = (probabilities > 0.5).float()
+            score = probabilities.item()
 
-            _, preds = torch.max(probabilities, 1)
+            event = 'wakeup' if prediction == 1 else 'onset'
 
-            # 3 events, none, onset and wakeup
-            event_mapping = {0: "onset", 1: "wakeup"}
-            events = [event_mapping[pred] for pred in preds.cpu().numpy()]
+            all_series_ids.append(series_id)
+            all_steps.append(step)
+            all_events.append(event)
+            all_scores.append(score)
 
-            # Scoring using logit values
-            scores = torch.sigmoid(outputs).cpu().numpy()
-            scores = [scores[i, pred].item() for i, pred in enumerate(preds.cpu().numpy())]
-
-            all_series_ids.extend(series_id)
-            all_steps.extend(event_step)
-            all_events.extend(events)
-            all_scores.extend(scores)
-
-    # Make submission file
     submission = pd.DataFrame({
         'series_id': all_series_ids,
         'step': all_steps,
@@ -66,14 +58,20 @@ def inference(model_path: str, test_dataloader: DataLoader):
 
     submission.to_csv('submission.csv', index=False)
 
-    return submission
-
-
 def main(config):
     # Load preprocessed data for inference
-    test_data_path = config.get('general').get('test_data').get('data_path')
-    test_data = pd.read_csv(test_data_path)
-    preprocessed_data = preprocess(test_data)
+    test_data_path = config.get('general').get('test_data').get('path')
+    test_data = pd.read_parquet(test_data_path)
+
+    ## test data를 train data와 동일한 형식으로 변경
+    test_data['event'] = False
+    data = test_data[['series_id', 'timestamp', 'step', 'event', 'anglez', 'enmo']]
+    data['series_id'], unique_series = pd.factorize(data['series_id'])
+
+    ## series_id map
+    id_map = [id for id in unique_series]
+
+    preprocessed_data = preprocess(data)
 
     window_size = config.get('inference').get('window_size')
     step = config.get('inference').get('step')
@@ -83,5 +81,6 @@ def main(config):
 
     batch_size = config.get('inference').get('batch_size')
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-    
+
+
     inference(model_path=config.get('general').get('checkpoint'), test_dataloader=test_dataloader)
