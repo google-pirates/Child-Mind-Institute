@@ -1,0 +1,29 @@
+model:
+  cnn:
+    activation: 'ReLU'
+    normalization: 'LayerNorm'
+    polling: 'MaxPool1d'
+    out_features: [100, 50, 20]
+    pooling_sizes: [2]
+    kernel_sizes: [1]
+    strides: [2]
+    dilations: [1]
+    dropout_rates: [0.4]
+    fc_outputs: [50, 1]
+    fc_dropout_rates: [0.4, 0.4]
+  lstm:
+    out_features: [50, 20]
+    normalization: 'LayerNorm'
+    bidirectional: True
+    activation: 'ReLU'
+    dropout_rates: [0.4, 0.4]
+    fc_outputs: [40, 1]
+    fc_dropout_rates: [0.4, 0.4]
+  tsmixer:
+    out_seq_len: 1
+    n_block: 10
+    # target_slice: None
+    normalization: 'LayerNorm'
+    dropout_rates: 0.4
+    ff_dim: 10
+    activation: 'ReLU'

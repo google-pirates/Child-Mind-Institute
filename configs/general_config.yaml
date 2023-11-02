@@ -1,0 +1,8 @@
+general:
+  data:
+    path: './data/merged_data.parquet'
+    excluding_columns: ['series_id', 'timestamp', 'step', 'night', 'event']
+  tensorboard:
+    path: './tensorboard'
+  test_data:
+    save_path: ...
