@@ -33,34 +33,36 @@ if __name__ == "__main__":
 
     #### nni ####
     if config.get('train').get('nni'):
-        config['train']['learnig_rate'] = None
-        config['train']['batch_size'] = None
-        config['train']['window_size'] = None
-        config['train']['data']['scaler'] = None
-        config['train']['optimizer'] = None
+        params = nni.get_next_parameter()
+
+        config['train']['learnig_rate'] = params.get('learnig_rate')
+        config['train']['batch_size'] = params.get('batch_size')
+        config['train']['window_size'] = params.get('window_size')
+        config['train']['data']['scaler'] = params.get('scaler')
+        config['train']['optimizer'] = params.get('optimizer')
 
         model_name = config.get('train').get('model').lower()
         if model_name == 'cnn':
-            config['model']['cnn']['out_features'] = None
-            config['model']['cnn']['pooling_sizes'] = None
-            config['model']['cnn']['kernel_sizes'] = None
-            config['model']['cnn']['strides'] = None
-            config['model']['cnn']['dilations'] = None
-            config['model']['cnn']['dropout_rates'] = None
-            config['model']['cnn']['fc_outputs'] = None
-            config['model']['cnn']['fc_dropout_rates'] = None
+            config['model']['cnn']['out_features'] = params.get('out_features')
+            config['model']['cnn']['pooling_sizes'] = [params.get('pooling_sizes')]
+            config['model']['cnn']['kernel_sizes'] = [params.get('kernel_sizes')]
+            config['model']['cnn']['strides'] = [params.get('strides')]
+            config['model']['cnn']['dilations'] = [params.get('dilations')]
+            config['model']['cnn']['dropout_rates'] = [params.get('dropout_rates')]
+            config['model']['cnn']['fc_outputs'] = params.get('fc_outputs')
+            config['model']['cnn']['fc_dropout_rates'] = params.get('fc_dropout_rates')
 
         elif model_name == 'LSTM':
-            config['model']['lstm']['out_features'] = None
-            config['model']['lstm']['bidirectional'] = None
-            config['model']['lstm']['dropout_rates'] = None
-            config['model']['lstm']['fc_outputs'] = None
-            config['model']['lstm']['fc_dropout_rates'] = None
+            config['model']['lstm']['out_features'] = params.get('out_features')
+            config['model']['lstm']['bidirectional'] = params.get('bidirectional')
+            config['model']['lstm']['dropout_rates'] = [params.get('dropout_rates')]
+            config['model']['lstm']['fc_outputs'] = params.get('fc_outputs')
+            config['model']['lstm']['fc_dropout_rates'] = params.get('fc_dropout_rates')
 
         elif model_name == 'tsmixer':
-            config['model']['tsmixer']['n_block'] = None
-            config['model']['tsmixer']['dropout_rates'] = None
-            config['model']['tsmixer']['ff_dim'] = None
+            config['model']['tsmixer']['n_block'] = params.get('n_block')
+            config['model']['tsmixer']['dropout_rates'] = [params.get('dropout_rates')]
+            config['model']['tsmixer']['ff_dim'] = params.get('ff_dim')
 
     if args.task == "train":
         if args.exp_name is None:
