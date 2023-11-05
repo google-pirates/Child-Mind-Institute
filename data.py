@@ -17,11 +17,11 @@ class ChildInstituteDataset(Dataset):
 
     def __getitem__(self, idx):
         return {
-            'X': torch.from_numpy(self.data[idx][:, 4:].astype(np.float32)),
-            'y': torch.from_numpy(self.data[idx][:, 3][-1:].astype(np.float32)),
-            'series_id': torch.from_numpy(self.data[idx][:, 0][:1].astype(np.int32)),
-            'date': str(self.data[idx][:, 1][-1:]), ## dataloader 객체는 datetime 타입 처리 불가
-            'step': torch.from_numpy(self.data[idx][:, 2][-1:][-1:].astype(np.int32)),
+            'X': torch.from_numpy(self.data[idx].get('X')),
+            'y': torch.from_numpy(self.data[idx].get('y')),
+            'series_id': torch.Tensor([self.data[idx].get('series_id')]),
+            'date': torch.Tensor([self.data[idx].get('date')]),
+            'step': torch.Tensor([self.data[idx].get('step')]),
         }
 
 
@@ -77,3 +77,12 @@ def to_list(data, window_size: int, config: Dict[str, str], step: int = 1, key: 
 
     return np.concatenate(slided_window, dtype=np.float32)
 
+
+def extract_keys(data, window_size: int, step: int = 1, key: List[str] = ['series_id']):
+    return (
+        data.groupby(key).apply(lambda x: x.iloc[window_size-1:])
+        .drop(columns=key)
+        .reset_index()
+        .drop(columns=[f'level_{len(key)}', 'anglez', 'enmo'])
+        .to_dict('records')
+    )[::step]
