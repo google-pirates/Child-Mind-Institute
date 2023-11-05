@@ -3,6 +3,7 @@ from typing import Union, Dict, List
 import torch
 from torch.utils.data import Dataset
 from sklearn import preprocessing
+from datetime import datetime
 import pandas as pd
 import numpy as np
 import pyarrow as pa
@@ -24,8 +25,31 @@ class ChildInstituteDataset(Dataset):
         }
 
 
-def preprocess(data, key: Union[str, List[str]] = 'series_id', **kwargs) -> pd.DataFrame:
-        
+def preprocess(data, key: List[str] = ['series_id'], **kwargs) -> pd.DataFrame:
+    data.rename(columns={'timestamp': 'date'}, inplace=True)
+
+    if isinstance(data.date[0], (np.int0, np.int8, np.int16, np.int32, np.int64)):
+        return data
+
+    if not isinstance(data.date[0], datetime):
+        data.date = data.date.astype(str).str.replace('-0400$', '')
+        data.date = pd.to_datetime(
+            data.date.str.replace('-0400$', ''),
+            format='%Y-%m-%dT%H:%M:%S',
+            utc=True)
+        data.date = data.date.astype('datetime64[ns]')
+        data.date = data.date.dt.date
+
+    if isinstance(data.date[0], datetime):
+        data.date = (
+            data.date
+            .fillna(-1)
+            .astype(str)
+            .str.replace('-', '')
+            .str.replace('^20', '', regex=True)
+            .astype(np.int32)
+        ) - 100000
+
     return data
 
 
