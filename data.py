@@ -61,13 +61,19 @@ def scale(data, config: Dict[str, str]) -> None:
     data.loc[:, target_columns] = scaler.fit_transform(data.filter(items=target_columns))
 
 
-def to_list(data, window_size: int, config: Dict[str, str], step: int = 1, key: Union[str, List[str]] = 'series_id') -> List[pd.DataFrame]:
+def to_list(data, window_size: int, config: Dict[str, str], step: int = 1, key: List[str] = ['series_id']) -> List[pd.DataFrame]:
     data = [datum[1] for datum in data.groupby(key)]
     for datum in data:
         scale(datum, config)
 
-    ## dtype=object 
-    slided_window = np.array([np.lib.stride_tricks.sliding_window_view(datum, window_size, axis=0)[::step] 
-                              for datum in data], dtype=object)
+    start_of_feature_index = np.where(data[0].columns.str.find('event') == 0)[0].item()
+    slided_window = [
+            np.lib.stride_tricks.sliding_window_view(
+                datum.iloc[:, start_of_feature_index:],
+                window_size,
+                axis=0)[::step]
+            for datum
+            in data]
 
-    return np.concatenate(slided_window).swapaxes(2, 1)
+    return np.concatenate(slided_window, dtype=np.float32)
+
