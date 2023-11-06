@@ -32,13 +32,13 @@ def preprocess(data, key: List[str] = ['series_id'], **kwargs) -> pd.DataFrame:
         return data
 
     if not isinstance(data.date[0], datetime):
-        data.date = data.date.astype(str).str.replace('-0400$', '')
+        data.date = data.date.astype(str).str.replace('[-+]\d{2}00$', '')
         data.date = pd.to_datetime(
-            data.date.str.replace('-0400$', ''),
+            data.date,
             format='%Y-%m-%dT%H:%M:%S',
             utc=True)
-        data.date = data.date.astype('datetime64[ns]')
         data.date = data.date.dt.date
+        data.date = data.date.astype('datetime64[ns]')
 
     if isinstance(data.date[0], datetime):
         data.date = (
