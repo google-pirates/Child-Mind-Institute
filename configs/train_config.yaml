@@ -2,7 +2,7 @@ train:
   model: 'CNN'
   learning_rate: 0.01
   batch_size: 32
-  window_size: 5
+  window_size: 30
   random_seed: 42
   data:
     scaler: 'StandardScaler'
@@ -12,7 +12,7 @@ train:
     name: 'BCEWithLogitsLoss'
     params:
       reduction: 'mean'
-  epochs: 2
+  epochs: 20
   patience: 5
   valid_size: 0.2
   scheduler: 'StepLR'

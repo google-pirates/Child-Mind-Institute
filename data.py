@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import pyarrow as pa
 
+
 class ChildInstituteDataset(Dataset):
     def __init__(self, data):
         self.data = data
@@ -32,7 +33,7 @@ def preprocess(data, key: List[str] = ['series_id'], **kwargs) -> pd.DataFrame:
         return data
 
     if not isinstance(data.date[0], datetime):
-        data.date = data.date.astype(str).str.replace('[-+]\d{2}00$', '')
+        data.date = data.date.astype(str).str.replace(r'[-+]\d{2}00$', '', regex=True)
         data.date = pd.to_datetime(
             data.date,
             format='%Y-%m-%dT%H:%M:%S',

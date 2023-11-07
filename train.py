@@ -1,22 +1,22 @@
-import models
-
+# pylint: disable=no-member
 import copy
-import pandas as pd
-import numpy as np
+import os
 import pickle
-import torch
+
+import numpy as np
+import pandas as pd
+from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import train_test_split
+import torch
 from torch import nn, optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-import os
 from tqdm import tqdm
-from sklearn.metrics import confusion_matrix
 
 from data import ChildInstituteDataset, preprocess, to_list, extract_keys
 from utils import make_logdir
-
+import models
 
 def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
           valid_dataloader: DataLoader, writer) -> nn.Module:
@@ -219,6 +219,8 @@ def main(config):
     data_path = config.get('general').get('data').get('path')
 
     merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet
+    merged_train_data = merged_train_data.iloc[::60]
+    merged_train_data['timestamp'] = pd.to_datetime(merged_train_data['timestamp'], format='%Y-%m-%d')
 
     preprocessed_data = preprocess(merged_train_data)
 
@@ -232,19 +234,7 @@ def main(config):
         train_key['X'] = train_list[i]
     train_list = train_keys
 
-    # train_data_list = []
-    # valid_data_list = []
-
-    ## train,test split 시 series_id 별로 split 할지,
-    ## 전체 데이터에 대해 split할지 결정 필요
-    ## 일단 series_id 별로 split 적용
-    ## define valid size from config. default = 0.2
     valid_set_size = config.get('train').get('valid_size', 0.2)
-
-    # for df in train_list:
-    #     train_df, valid_df = train_test_split(df, test_size=valid_set_size, shuffle=False)
-    #     train_data_list.append(train_df)
-    #     valid_data_list.append(valid_df)
 
     train_data_list, valid_data_list = train_test_split(train_list,
                                                         test_size=valid_set_size,
@@ -254,10 +244,10 @@ def main(config):
     train_dataset = ChildInstituteDataset(train_data_list)
     valid_dataset = ChildInstituteDataset(valid_data_list)
 
-    BATCH_SIZE = config.get('train').get('batch_size')
+    batch_size = config.get('train').get('batch_size')
     train_data_shuffle = config.get('train').get('data').get('shuffle')
-    train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=train_data_shuffle)
-    valid_dataloader = DataLoader(valid_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=train_data_shuffle)
+    valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
 
 
     example_batch = next(iter(train_dataloader))

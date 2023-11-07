@@ -10,3 +10,16 @@ models/__pycache__/lstm.cpython-310.pyc
 models/__pycache__/tsmixer.cpython-310.pyc
 test.ipynb
 data_eda.ipynb
+submission_cnn.csv
+submission_lstm.csv
+submission_tsmixer.csv
+submission.csv
+submission2.csv
+data/merged_data.parquet
+data/sample_submission.csv
+data/test_series.parquet
+data/testing.parquet
+data/testing2.parquet
+models/__pycache__/__init__.cpython-310.pyc
+submission_final.csv
+submission3.csv
