@@ -251,6 +251,7 @@ def main(config):
 
 
     example_batch = next(iter(train_dataloader))
+    
     _, seq_len, n_features = example_batch['X'].shape
     config['train'].update({'seq_len': seq_len, 'n_features': n_features})
 

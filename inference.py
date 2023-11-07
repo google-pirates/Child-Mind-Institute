@@ -78,10 +78,10 @@ def main(config):
             key['X'] = test_list[i]
 
         test_dataset = ChildInstituteDataset(test_keys)
-        test_dataloader = DataLoader(test_dataset, batch_size=config.get('inference').get('batch_size'), 
+        test_dataloader = DataLoader(test_dataset, batch_size=config.get('inference').get('batch_size'),
                                      shuffle=False)
-
-        submission = inference(model_path=config.get('general').get('checkpoint'), 
+        
+        submission = inference(model_path=config.get('general').get('checkpoint'),
                                test_dataloader=test_dataloader)
         ## rolling
         submission['event'] = submission['event'].transform(
@@ -108,6 +108,6 @@ def main(config):
     final_submission['row_id'] = final_submission.index.astype(int)
     final_submission = final_submission[['row_id', 'series_id', 'step', 'event', 'score']]
 
-    final_submission.to_csv('submission_rolling_cnn_onset_1st_wakeup_last.csv', index=False)
+    final_submission.to_csv('submission_rolling_tsmixer_onset_1st_wakeup_last.csv', index=False)
     return final_submission
 

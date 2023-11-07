@@ -22,7 +22,7 @@ model:
   tsmixer:
     out_seq_len: 1
     n_block: 10
-    target_slice: [1]
+    # target_slice: 
     normalization: 'LayerNorm'
     dropout_rates: 0.4
     ff_dim: 10
