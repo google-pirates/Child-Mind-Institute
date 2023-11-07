@@ -23,3 +23,5 @@ data/testing2.parquet
 models/__pycache__/__init__.cpython-310.pyc
 submission_final.csv
 submission3.csv
+submission_rolling_cnn_onset_1st_wakeup_last.csv
+submission_rolling.csv

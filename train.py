@@ -219,7 +219,7 @@ def main(config):
     data_path = config.get('general').get('data').get('path')
 
     merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet
-    merged_train_data = merged_train_data.iloc[::60]
+    merged_train_data = merged_train_data.iloc[::120]
     merged_train_data['timestamp'] = pd.to_datetime(merged_train_data['timestamp'], format='%Y-%m-%d')
 
     preprocessed_data = preprocess(merged_train_data)

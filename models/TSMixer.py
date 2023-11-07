@@ -80,19 +80,21 @@ class TSMixer(nn.Module):
 
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
-        x = batch.get('X')  # batch, seq_len, n_features
+        x = batch.get('X')  # [batch_size, seq_len, n_features]
         if x is None:
-            raise ValueError("Input 'X' is not found in the batch") ## TorchScript에서 Optional[Tensor] 를 트래킹하기 위함
+            raise ValueError("Input 'X' is not found in the batch")
 
         for block in self.blocks:
             x = block(x)
-        
-        if self.target_slice is not None:
-            x = x[:, :, self.target_slice]
 
-        # x_transposed = x.transpose(1, 2)  # batch, n_features, seq_len
-        # x_out = self.final_dense(x_transposed)
-        # x_out = x_out.transpose(1, 2)  # batch, seq_len, n_features
-        x_selected = x[:, -1, :] ## 마지막 시간 단계를 이용하여 출력 생성
-        return self.final_dense(x_selected)
-    
+        if self.target_slice is not None:
+            batch_size = x.shape[0]
+            x_out = torch.zeros(batch_size, len(self.target_slice), self.out_seq_len, device=x.device)
+
+            for idx, target_idx in enumerate(self.target_slice):
+                x_slice = x[:, target_idx, :]  # [batch_size, n_features]
+                x_out[:, idx, :] = self.final_dense(x_slice)  # [batch_size, out_seq_len]
+        else:
+            x_out = self.final_dense(x.transpose(1, 2))  # [batch_size, n_features, seq_len]
+
+        return x_out.transpose(1, 2) 
