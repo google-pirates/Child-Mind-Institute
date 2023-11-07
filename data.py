@@ -18,10 +18,10 @@ class ChildInstituteDataset(Dataset):
     def __getitem__(self, idx):
         return {
             'X': torch.from_numpy(self.data[idx].get('X')),
-            'y': torch.from_numpy(self.data[idx].get('y')),
-            'series_id': torch.Tensor([self.data[idx].get('series_id')]),
-            'date': torch.Tensor([self.data[idx].get('date')]),
-            'step': torch.Tensor([self.data[idx].get('step')]),
+            'y': torch.Tensor([self.data[idx].get('event')]),
+            'series_id': self.data[idx].get('series_id'),
+            'date': self.data[idx].get('date'),
+            'step': self.data[idx].get('step'),
         }
 
 
@@ -66,7 +66,7 @@ def to_list(data, window_size: int, config: Dict[str, str], step: int = 1, key: 
     for datum in data:
         scale(datum, config)
 
-    start_of_feature_index = np.where(data[0].columns.str.find('event') == 0)[0].item()
+    start_of_feature_index = np.where(data[0].columns.str.find('anglez') == 0)[0].item()
     slided_window = [
             np.lib.stride_tricks.sliding_window_view(
                 datum.iloc[:, start_of_feature_index:],
