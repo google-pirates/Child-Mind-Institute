@@ -27,7 +27,7 @@ def inference(model_path: str, test_dataloader: DataLoader):
             series_id = batch['series_id'][0]
             step = batch['step'][-1].item()
             date = batch['date'][-1].item()
-
+            # print("X:", inputs.shape)
             outputs = model({'X': inputs})
 
             probabilities = torch.sigmoid(outputs)
@@ -58,9 +58,9 @@ def main(config):
     test_data_path = config.get('general').get('test_data').get('path')
     test_data = pd.read_parquet(test_data_path, columns=['series_id', 'timestamp', 'step', 'anglez', 'enmo'])
     test_data['event'] = 0
-
+    test_data = test_data[['series_id', 'timestamp', 'step', 'event', 'anglez', 'enmo']]
+    # test_data['timestamp'] = pd.to_datetime(test_data['timestamp'], format='%Y-%m-%d')
     unique_series_ids = test_data['series_id'].unique()
-
     all_submissions = []
 
     for series_id in unique_series_ids:
@@ -78,11 +78,12 @@ def main(config):
             key['X'] = test_list[i]
 
         test_dataset = ChildInstituteDataset(test_keys)
-        test_dataloader = DataLoader(test_dataset, batch_size=config.get('inference').get('batch_size'),
-                                     shuffle=False)
-        
+        test_dataloader = DataLoader(test_dataset, 
+                                     batch_size=config.get('inference').get('batch_size'),
+                                    shuffle=False)
+
         submission = inference(model_path=config.get('general').get('checkpoint'),
-                               test_dataloader=test_dataloader)
+                            test_dataloader=test_dataloader)
         ## rolling
         submission['event'] = submission['event'].transform(
             lambda x: x.rolling(window=7, min_periods=1).aggregate(
@@ -91,23 +92,29 @@ def main(config):
         )
         ##
         ## event 드랍 시에 onset 이벤트는 처음을 남기고, wakeup 이벤트는 마지막을 남기도록 수정
-        onset_df = submission[submission['event'] == 0.0].drop_duplicates(subset=['date'], keep='first')
-        wakeup_df = submission[submission['event'] == 1.0].drop_duplicates(subset=['date'], keep='last')
-        droped_submission = pd.concat([onset_df, wakeup_df]).sort_values(['date', 'event'])
-        droped_submission['event'] = droped_submission['event'].map({0.0: 'onset', 1.0: 'wakeup'})
-        all_submissions.append(droped_submission)
+        # onset_df = submission[submission['event'] == 0.0].drop_duplicates(subset=['date'], keep='first')
+        # wakeup_df = submission[submission['event'] == 1.0].drop_duplicates(subset=['date'], keep='last')
+        # droped_submission = pd.concat([onset_df, wakeup_df]).sort_values(['date', 'event'])
+        # droped_submission['event'] = droped_submission['event'].map({0.0: 'onset', 1.0: 'wakeup'})
+        # all_submissions.append(droped_submission)
         ##
-        ## submission = submission.drop_duplicates(subset=['date', 'event'], keep='first')
-        ## all_submissions.append(submission)
-
+        submission = submission.drop_duplicates(subset=['date', 'event'], keep='first')
+        submission['event'] = submission['event'].map({0.0: 'onset', 1.0: 'wakeup'})
+        all_submissions.append(submission)
 
     final_submission = pd.concat(all_submissions).reset_index(drop=True)
     final_submission['score'] = final_submission['score'].astype(float)
 
+
+    ## 이벤트가 onset 인 경우 스코어 반전
+    final_submission['score'] = np.where( final_submission['event'] == 'onset', 
+                                         1 - final_submission['score'], 
+                                         final_submission['score'])
+    
     final_submission = final_submission.sort_values(['series_id', 'step']).reset_index(drop=True)
     final_submission['row_id'] = final_submission.index.astype(int)
     final_submission = final_submission[['row_id', 'series_id', 'step', 'event', 'score']]
 
-    final_submission.to_csv('submission_rolling_tsmixer_onset_1st_wakeup_last.csv', index=False)
+    final_submission.to_csv('submission_rolling_tsmixer_onset_1st_wakeup_last_testing2.csv', index=False)
     return final_submission
 
