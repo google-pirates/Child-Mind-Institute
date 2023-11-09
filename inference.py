@@ -4,13 +4,9 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import numpy as np
+import os
 
 from data import ChildInstituteDataset, preprocess, to_list, extract_keys
-
-import cProfile
-import pstats
-import io
-
 
 
 def inference(model, test_dataloader: DataLoader):
@@ -39,7 +35,7 @@ def inference(model, test_dataloader: DataLoader):
             all_steps.extend([step] * len(predictions))
             # all_events.extend(events)
             all_events.append(predictions)
-            all_scores.extend(["{:.10f}".format(score.item()) for score in scores])
+            all_scores.extend(["{:.5f}".format(score.item()) for score in scores])
             all_dates.append(date)
 
     submission = pd.DataFrame({
@@ -83,9 +79,10 @@ def main(config):
             key['X'] = test_list[i]
 
         test_dataset = ChildInstituteDataset(test_keys)
-        test_dataloader = DataLoader(test_dataset, 
-                                     batch_size=config.get('inference').get('batch_size'),
-                                    shuffle=False)
+        test_dataloader = DataLoader(test_dataset,
+                                    batch_size=config.get('inference').get('batch_size'),
+                                    shuffle=False,
+                                    num_workers=os.cpu_count)
 
         submission = inference(model, test_dataloader=test_dataloader)
         ## rolling
@@ -103,8 +100,8 @@ def main(config):
 
     ## 이벤트가 onset 인 경우 스코어 반전
     final_submission['score'] = np.where( final_submission['event'] == 'onset',
-                                         1 - final_submission['score'],
-                                         final_submission['score'])
+                                         (1 - final_submission['score']) /100,
+                                         final_submission['score']/100)
     
     final_submission = final_submission.sort_values(['series_id', 'step']).reset_index(drop=True)
     final_submission['row_id'] = final_submission.index.astype(int)
