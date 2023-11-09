@@ -4,10 +4,8 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import numpy as np
-import os
 
 from data import ChildInstituteDataset, preprocess, to_list, extract_keys
-
 
 def inference(model, test_dataloader: DataLoader):
     all_series_ids = []
@@ -48,6 +46,7 @@ def inference(model, test_dataloader: DataLoader):
 
     return submission
 
+
 def main(config):
     # Load preprocessed data for inference
     test_data_path = config.get('general').get('test_data').get('path')
@@ -81,14 +80,16 @@ def main(config):
         test_dataset = ChildInstituteDataset(test_keys)
         test_dataloader = DataLoader(test_dataset,
                                     batch_size=config.get('inference').get('batch_size'),
-                                    shuffle=False,
-                                    num_workers=os.cpu_count())
+                                    shuffle=False
+                                    # num_workers=os.cpu_count()
+                                    )
 
         submission = inference(model, test_dataloader=test_dataloader)
         ## rolling
         submission['event'] = submission['event'].rolling(window=7, min_periods=1).apply(
             lambda x: x.mode()[0] if not x.mode().empty else np.nan, raw=False
         )
+
         submission = submission.drop_duplicates(subset=['date', 'event'], keep='first')
         submission['event'] = submission['event'].map({0.0: 'onset', 1.0: 'wakeup'})
         all_submissions.append(submission)
@@ -97,12 +98,12 @@ def main(config):
     final_submission = pd.concat(all_submissions).reset_index(drop=True)
     final_submission['score'] = final_submission['score'].astype(float)
 
-
     ## 이벤트가 onset 인 경우 스코어 반전
     final_submission['score'] = np.where( final_submission['event'] == 'onset',
                                          (1 - final_submission['score']) /100,
                                          final_submission['score']/100)
     
+    final_submission['score'] = final_submission['score'].round(5)
     final_submission = final_submission.sort_values(['series_id', 'step']).reset_index(drop=True)
     final_submission['row_id'] = final_submission.index.astype(int)
     final_submission = final_submission[['row_id', 'series_id', 'step', 'event', 'score']]
