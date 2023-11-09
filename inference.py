@@ -82,7 +82,7 @@ def main(config):
         test_dataloader = DataLoader(test_dataset,
                                     batch_size=config.get('inference').get('batch_size'),
                                     shuffle=False,
-                                    num_workers=os.cpu_count)
+                                    num_workers=os.cpu_count())
 
         submission = inference(model, test_dataloader=test_dataloader)
         ## rolling
