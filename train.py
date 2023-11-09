@@ -109,7 +109,7 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
             predictions = (probabilities > 0.5).float()
             train_corrects += torch.sum(predictions == labels)
             train_total_samples += inputs.size(0)
-            train_confusion_matrix += confusion_matrix(labels, predictions)
+            train_confusion_matrix += confusion_matrix(labels.cpu().numpy(), predictions.cpu().numpy())
         avg_train_loss = training_loss / len(train_dataloader)
         train_losses.append(avg_train_loss)
         train_accuracy = train_corrects.double() / train_total_samples
@@ -154,7 +154,7 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
                 predictions = (probabilities > 0.5).float()
                 valid_corrects += torch.sum(predictions == labels)
                 valid_total_samples += inputs.size(0)
-                valid_confusion_matrix += confusion_matrix(labels, predictions)
+                valid_confusion_matrix += confusion_matrix(labels.cpu().numpy(), predictions.cpu().numpy())
         avg_valid_loss = valid_loss / len(valid_dataloader)
         valid_losses.append(avg_valid_loss)
 
@@ -220,7 +220,7 @@ def main(config):
 
     merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet
     # merged_train_data = merged_train_data.iloc[::20]
-    # merged_train_data['timestamp'] = pd.to_datetime(merged_train_data['timestamp'], format='%Y-%m-%d')
+    merged_train_data['timestamp'] = pd.to_datetime(merged_train_data['timestamp'], format='%Y-%m-%d')
 
     preprocessed_data = preprocess(merged_train_data)
 

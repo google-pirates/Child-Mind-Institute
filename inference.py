@@ -7,14 +7,13 @@ import numpy as np
 
 from data import ChildInstituteDataset, preprocess, to_list, extract_keys
 
+import cProfile
+import pstats
+import io
 
-def inference(model_path: str, test_dataloader: DataLoader):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = torch.jit.load(model_path, map_location=device)
-    model.to(device)
-    model.eval()
 
+def inference(model, test_dataloader: DataLoader):
     all_series_ids = []
     all_steps = []
     all_events = []
@@ -23,12 +22,12 @@ def inference(model_path: str, test_dataloader: DataLoader):
 
     with torch.no_grad():
         for batch in tqdm(test_dataloader, desc='Inference'):
-            inputs = batch['X'].to(device)
+            # inputs = batch['X'].to(device)
             series_id = batch['series_id'][0]
             step = batch['step'][-1].item()
             date = batch['date'][-1].item()
             # print("X:", inputs.shape)
-            outputs = model({'X': inputs})
+            outputs = model({'X': batch['X'].permute(0,2,1)})
 
             probabilities = torch.sigmoid(outputs)
             predictions = (probabilities > 0.5).float()
@@ -63,6 +62,12 @@ def main(config):
     unique_series_ids = test_data['series_id'].unique()
     all_submissions = []
 
+    ## Load model
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = torch.jit.load(config.get('general').get('checkpoint'), map_location=device)
+    model.to(device)
+    model.eval()
+
     for series_id in unique_series_ids:
         series_data = test_data[test_data['series_id'] == series_id].copy()
         series_data.reset_index(drop=True, inplace=True)
@@ -82,39 +87,29 @@ def main(config):
                                      batch_size=config.get('inference').get('batch_size'),
                                     shuffle=False)
 
-        submission = inference(model_path=config.get('general').get('checkpoint'),
-                            test_dataloader=test_dataloader)
+        submission = inference(model, test_dataloader=test_dataloader)
         ## rolling
-        submission['event'] = submission['event'].transform(
-            lambda x: x.rolling(window=7, min_periods=1).aggregate(
-                lambda y: y.mode()[0] if not y.mode().empty else np.nan
-            )
+        submission['event'] = submission['event'].rolling(window=7, min_periods=1).apply(
+            lambda x: x.mode()[0] if not x.mode().empty else np.nan, raw=False
         )
-        ##
-        ## event 드랍 시에 onset 이벤트는 처음을 남기고, wakeup 이벤트는 마지막을 남기도록 수정
-        # onset_df = submission[submission['event'] == 0.0].drop_duplicates(subset=['date'], keep='first')
-        # wakeup_df = submission[submission['event'] == 1.0].drop_duplicates(subset=['date'], keep='last')
-        # droped_submission = pd.concat([onset_df, wakeup_df]).sort_values(['date', 'event'])
-        # droped_submission['event'] = droped_submission['event'].map({0.0: 'onset', 1.0: 'wakeup'})
-        # all_submissions.append(droped_submission)
-        ##
         submission = submission.drop_duplicates(subset=['date', 'event'], keep='first')
         submission['event'] = submission['event'].map({0.0: 'onset', 1.0: 'wakeup'})
         all_submissions.append(submission)
+
 
     final_submission = pd.concat(all_submissions).reset_index(drop=True)
     final_submission['score'] = final_submission['score'].astype(float)
 
 
     ## 이벤트가 onset 인 경우 스코어 반전
-    final_submission['score'] = np.where( final_submission['event'] == 'onset', 
-                                         1 - final_submission['score'], 
+    final_submission['score'] = np.where( final_submission['event'] == 'onset',
+                                         1 - final_submission['score'],
                                          final_submission['score'])
     
     final_submission = final_submission.sort_values(['series_id', 'step']).reset_index(drop=True)
     final_submission['row_id'] = final_submission.index.astype(int)
     final_submission = final_submission[['row_id', 'series_id', 'step', 'event', 'score']]
 
-    final_submission.to_csv('submission_rolling_tsmixer_onset_1st_wakeup_last_testing2.csv', index=False)
+    final_submission.to_csv('submission.csv', index=False)
     return final_submission
 

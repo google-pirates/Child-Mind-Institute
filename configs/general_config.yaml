@@ -5,4 +5,4 @@ general:
   tensorboard:
     path: './tensorboard'
   test_data:
-    path: './data/testing2.parquet'
+    path: './data/test_series.parquet'
