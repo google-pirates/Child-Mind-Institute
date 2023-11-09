@@ -29,3 +29,5 @@ submission_rolling_tsmixer_onset_1st_wakeup_last_testing2.csv
 submission_rolling_tsmixer_onset_1st_wakeup_last.csv
 data/train_events.csv
 data/Zzzs_train.parquet
+__pycache__/metric.cpython-310.pyc
+data/id_map.pickle
