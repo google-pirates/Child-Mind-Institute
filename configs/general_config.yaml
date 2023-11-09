@@ -1,6 +1,6 @@
 general:
   data:
-    path: './data/Zzzs_train.parquet'
+    path: './data/mreged_data.parquet'
     excluding_columns: ['series_id', 'timestamp', 'step', 'night', 'event']
   tensorboard:
     path: './tensorboard'

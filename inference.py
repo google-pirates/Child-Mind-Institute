@@ -50,7 +50,9 @@ def inference(model, test_dataloader: DataLoader):
 def main(config):
     # Load preprocessed data for inference
     test_data_path = config.get('general').get('test_data').get('path')
-    test_data = pd.read_parquet(test_data_path, columns=['series_id', 'timestamp', 'step', 'anglez', 'enmo'])
+    test_data = pd.read_parquet(test_data_path, 
+                                columns=['series_id', 'timestamp', 'step', 'anglez', 'enmo'])
+
     test_data['event'] = 0
     test_data = test_data[['series_id', 'timestamp', 'step', 'event', 'anglez', 'enmo']]
     # test_data['timestamp'] = pd.to_datetime(test_data['timestamp'], format='%Y-%m-%d')
@@ -90,9 +92,17 @@ def main(config):
             lambda x: x.mode()[0] if not x.mode().empty else np.nan, raw=False
         )
 
-        submission = submission.drop_duplicates(subset=['date', 'event'], keep='first')
-        submission['event'] = submission['event'].map({0.0: 'onset', 1.0: 'wakeup'})
-        all_submissions.append(submission)
+        ## droping
+        ## event 드랍 시에 onset 이벤트는 처음을 남기고, wakeup 이벤트는 마지막을 남기도록 수정
+        onset_df = submission[submission['event'] == 0.0].drop_duplicates(subset=['date'], keep='first')
+        wakeup_df = submission[submission['event'] == 1.0].drop_duplicates(subset=['date'], keep='last')
+        droped_submission = pd.concat([onset_df, wakeup_df]).sort_values(['date', 'event'])
+        droped_submission['event'] = droped_submission['event'].map({0.0: 'onset', 1.0: 'wakeup'})
+        all_submissions.append(droped_submission)
+        ##
+        # submission = submission.drop_duplicates(subset=['date', 'event'], keep='first')
+        # submission['event'] = submission['event'].map({0.0: 'onset', 1.0: 'wakeup'})
+        # all_submissions.append(submission)
 
 
     final_submission = pd.concat(all_submissions).reset_index(drop=True)
@@ -100,14 +110,14 @@ def main(config):
 
     ## 이벤트가 onset 인 경우 스코어 반전
     final_submission['score'] = np.where( final_submission['event'] == 'onset',
-                                         (1 - final_submission['score']) /100,
-                                         final_submission['score']/100)
+                                         (final_submission['score']),
+                                         (1-final_submission['score']))
     
     final_submission['score'] = final_submission['score'].round(5)
     final_submission = final_submission.sort_values(['series_id', 'step']).reset_index(drop=True)
     final_submission['row_id'] = final_submission.index.astype(int)
     final_submission = final_submission[['row_id', 'series_id', 'step', 'event', 'score']]
 
-    final_submission.to_csv('submission.csv', index=False)
+    final_submission.to_csv('submission2.csv', index=False)
     return final_submission
 
