@@ -31,3 +31,5 @@ data/train_events.csv
 data/Zzzs_train.parquet
 __pycache__/metric.cpython-310.pyc
 data/id_map.pickle
+submission_test.csv
+submission_test2.csv
