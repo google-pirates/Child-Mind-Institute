@@ -7,7 +7,6 @@ import numpy as np
 
 from sklearn.metrics import mean_squared_error
 from scipy.signal import argrelmin, argrelmax
-from scipy import signal
 from scipy.signal import filtfilt, butter
 
 from data import ChildInstituteDataset, preprocess, to_list, extract_keys
@@ -38,12 +37,11 @@ def inference(model_path: str, test_dataloader: DataLoader):
             scores = torch.sigmoid(outputs).detach().cpu().numpy()
             if scores.ndim > 0 and scores.size > 0:
                 before_RMSE = np.sqrt(mean_squared_error(scores, np.zeros_like(scores)))
-                filtered_scores = lpf(scores)  # lpf 함수를 호출하기 전에 길이 검사를 수행합니다.
+                filtered_scores = lpf(scores)
                 after_RMSE = np.sqrt(mean_squared_error(filtered_scores, np.zeros_like(filtered_scores)))
                 decay_ratio = before_RMSE / after_RMSE if after_RMSE else 1
                 filtered_scores *= decay_ratio
             else:
-                # scores가 적절한 형상이 아닐 경우 RMSE 계산을 건너뜁니다.
                 filtered_scores = scores
 
             onset_candi = argrelmin(filtered_scores, order=12*60*6)[0]
