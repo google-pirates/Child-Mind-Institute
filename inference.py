@@ -26,7 +26,7 @@ def inference(model_path: str, test_dataloader: DataLoader):
             series_ids = batch['series_id']
             steps = batch['step'].cpu().numpy()
             dates = batch['date'].cpu().numpy()
-            outputs = model({'X': inputs})
+            outputs = model({'X': inputs.permute(0, 2, 1)})
 
             probabilities = torch.sigmoid(outputs)
             predictions = (probabilities > 0.5).float()
@@ -54,19 +54,97 @@ def inference(model_path: str, test_dataloader: DataLoader):
 
     return submission
 
+# def select_events(series_data, onset_min_step, wakeup_min_step, max_step):
+#     selected_events = []
+#     series_data = series_data.copy()
+
+#     # 이벤트 변화를 감지하기 위한 표시자 추가
+#     series_data['change_point'] = series_data['event'].diff().ne(0).astype('int')
+#     series_data.iloc[0, series_data.columns.get_loc('change_point')] = 1  # 첫 번째 행은 항상 변화 지점으로 처리
+
+#     # 모든 변화 지점을 가져옵니다
+#     change_points = series_data[series_data['change_point'] == 1].index.tolist()
+#     change_points.append(series_data.index[-1] + 1)  # 마지막 인덱스 추가
+
+#     # 각 변화 지점부터 다음 변화 지점까지의 스텝 차이를 기반으로 이벤트 선택
+#     for i in range(len(change_points) - 1):
+#         start_index = change_points[i]
+#         end_index = change_points[i + 1] - 1
+
+#         # 스텝 차이 계산
+#         step_difference = series_data.loc[end_index, 'step'] - series_data.loc[start_index, 'step']
+
+#         # 이벤트 유형에 따라 다른 최소 스텝 기준 적용
+#         event_type = series_data.loc[start_index, 'event']
+#         min_step = onset_min_step if event_type == 0 else wakeup_min_step
+
+#         # 스텝 차이가 min_step 이상, max_step 미만이면 해당 이벤트 그룹을 처리
+#         if min_step <= step_difference < max_step:
+#             event_group = series_data.iloc[start_index:end_index + 1]
+#             # 이벤트 유형에 따라 선택 기준 적용
+#             selected_event = event_group.loc[event_group['score'].idxmin()] if event_type == 0 else event_group.loc[event_group['score'].idxmax()]
+#             selected_events.append(selected_event)
+#         # 스텝 차이가 min_step 미만이면 해당 이벤트들 드랍
+#         elif step_difference < min_step:
+#             continue
+
+#     return pd.DataFrame(selected_events)
+
+def select_events(series_data, onset_min_step, wakeup_min_step):
+    selected_events = []
+    series_data = series_data.copy()
+
+    # 이벤트 변화를 감지하기 위한 표시자 추가
+    series_data['change_point'] = series_data['event'].diff().ne(0).astype('int')
+    series_data.iloc[0, series_data.columns.get_loc('change_point')] = 1  # 첫 번째 행은 항상 변화 지점으로 처리
+
+    # 모든 변화 지점을 가져옵니다
+    change_points = series_data[series_data['change_point'] == 1].index.tolist()
+    change_points.append(series_data.index[-1] + 1)  # 마지막 인덱스 추가
+
+    # 각 변화 지점부터 다음 변화 지점까지의 스텝 차이를 기반으로 이벤트 선택
+    for i in range(len(change_points) - 1):
+        start_index = change_points[i]
+        end_index = change_points[i + 1] - 1
+
+        # 스텝 차이 계산
+        step_difference = series_data.loc[end_index, 'step'] - series_data.loc[start_index, 'step']
+
+        # 이벤트 유형에 따라 다른 최소 스텝 기준 적용
+        event_type = series_data.loc[start_index, 'event']
+        min_step = onset_min_step if event_type == 0 else wakeup_min_step
+
+        # 스텝 차이가 이벤트 유형별 min_step 이상이면 해당 이벤트 그룹을 처리
+        if step_difference >= min_step:
+            event_group = series_data.iloc[start_index:end_index + 1]
+            # 첫 스텝의 이벤트만 선택
+            selected_event = event_group.iloc[0]
+            selected_events.append(selected_event)
+        # 스텝 차이가 이벤트 유형별 min_step 미만이면 해당 이벤트들 드랍
+        else:
+            continue
+
+    return pd.DataFrame(selected_events)
+
+
 def main(config):
     # Load preprocessed data for inference
     test_data_path = config.get('general').get('test_data').get('path')
-    test_data = pd.read_parquet(test_data_path, columns=['series_id', 'timestamp', 'step', 'anglez', 'enmo'])
+    
+    test_data = pd.read_parquet(test_data_path)
     test_data['event'] = -1
     test_data = test_data[['series_id', 'timestamp', 'step', 'event', 'anglez', 'enmo']]
-    # test_data['timestamp'] = pd.to_datetime(test_data['timestamp'], format='%Y-%m-%d')
+    test_data['timestamp'] = pd.to_datetime(test_data['timestamp'], format='%Y-%m-%d')
+    
     window_size = config.get('inference').get('window_size')
     step_size = config.get('inference').get('step')
 
     unique_series_ids = test_data['series_id'].unique()
     all_submissions = []
 
+    ## Train set 내에서 이벤트 간 step 차이의 최소 576(48분), 최대 18228(약 26시간)
+    onset_min_step = 500
+    wakeup_min_step = 2000
     for series_id in unique_series_ids:
         series_data = test_data[test_data['series_id'] == series_id].copy()
         series_data.reset_index(drop=True, inplace=True)
@@ -88,43 +166,18 @@ def main(config):
         submission = inference(model_path=config.get('general').get('checkpoint'),
                             test_dataloader=test_dataloader)
 
-        submission['event'] = submission['event'].rolling(window=7, min_periods=1).mean().apply(
-            lambda x: 1 if x > 0.5 else (0 if pd.notnull(x) else np.nan)
-        )
-        
+    #     submission['event'] = submission['event'].rolling(window=7, min_periods=1).mean().apply(
+    #         lambda x: 1 if x > 0.5 else (0 if pd.notnull(x) else np.nan)
+    #     )
+    #     selected_submission = select_events(submission, onset_min_step, wakeup_min_step)
 
-        # 연속된 이벤트를 탐지
-        events = []
-        start_idx = None
-        min_duration = 12 * 30 ## 30분 
-        max_duration = 24 * 60 * 12 ## 1일
-        events = []
-        start_idx = None
-        last_event = None
-        for idx, (event, _ ) in enumerate(zip(submission['event'], submission['step'])):
-            if last_event is None or last_event != event:
-                if start_idx is not None:
-                    # 이전 이벤트가 min_duration과 max_duration 사이에 있는 경우에만 기록
-                    duration = idx - start_idx
-                    if min_duration <= duration <= max_duration:
-                        events.append((submission['series_id'][start_idx],
-                                       submission['step'][start_idx],
-                                       last_event,
-                                       submission['score'][start_idx]))
-                start_idx = idx
-                last_event = event
-
-        # 마지막 연속된 이벤트 처리
-        if start_idx is not None and min_duration <= (len(submission) - start_idx) <= max_duration:
-            events.append((submission['series_id'][start_idx], submission['step'][start_idx], last_event, submission['score'][start_idx]))
-
-        # 연속된 이벤트 데이터프레임 생성
-        events_df = pd.DataFrame(events, columns=['series_id', 'step', 'event', 'score'])
-        all_submissions.append(events_df)
-
-
-
-    final_submission = pd.concat(all_submissions).reset_index(drop=True)
+    #     if not selected_submission.empty:
+    #         all_submissions.append(selected_submission)
+        all_submissions.append(submission)
+    if all_submissions:
+        final_submission = pd.concat(all_submissions).reset_index(drop=True)
+    else:
+        final_submission = pd.DataFrame(columns=['row_id', 'series_id', 'step', 'event', 'score'])
 
     final_submission['event'] = final_submission['event'].map({0: 'onset', 1: 'wakeup'})
     final_submission['score'] = final_submission['score'].astype(float)
