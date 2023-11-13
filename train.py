@@ -92,10 +92,11 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
         for batch in tqdm(train_dataloader, desc='train iter'):
             ## data에서 X, y 정의
             inputs = batch['X']
+            inputs1 = batch['X1']
             labels = batch['y']
-            inputs, labels = inputs.to(device), labels.to(device)
+            inputs, inputs1, labels = inputs.to(device), inputs1.to(device), labels.to(device)
             optimizer.zero_grad()
-            outputs = model({'X': inputs, 'y': labels}) # [batch_size, 1]
+            outputs = model({'X': inputs, 'X1': inputs1, 'y': labels}) # [batch_size, 1]
             # outputs = outputs.squeeze()  # [batch_size, 1] -> [batch_size]
             # labels = labels.squeeze()
 
@@ -214,13 +215,14 @@ def main(config):
     # Tensorboard
     log_dir = make_logdir(tensorboard_path, config.get('general').get('exp_name'))
     writer = SummaryWriter(log_dir=log_dir)
+    config['general']['log_dir'] = log_dir
 
     ## train data merge
     data_path = config.get('general').get('data').get('path')
 
     merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet
     # merged_train_data = merged_train_data.iloc[::20]
-    merged_train_data['timestamp'] = pd.to_datetime(merged_train_data['timestamp'], format='%Y-%m-%d')
+    # merged_train_data['timestamp'] = pd.to_datetime(merged_train_data['timestamp'], format='%Y-%m-%d')
 
     preprocessed_data = preprocess(merged_train_data)
 
@@ -229,7 +231,7 @@ def main(config):
 
     train_list, train_list2 = to_list(preprocessed_data, window_size, config, step)
     train_keys = extract_keys(preprocessed_data, window_size, step)
-    for i, train_key in enumerate(train_keys[1:]):
+    for i, train_key in enumerate(train_keys):
         train_key['X'] = train_list[i]
         train_key['X1'] = train_list2[i]
     train_list = train_keys
@@ -253,7 +255,7 @@ def main(config):
     example_batch = next(iter(train_dataloader))
     
     _, seq_len, n_features = example_batch['X'].shape
-    _, seq_len, n_features1 = example_batch['X1'].shape
+    _, n_features1 = example_batch['X1'].shape
     config['train'].update({'seq_len': seq_len, 'n_features': n_features, 'n_features1': n_features1})
 
     ### train ###

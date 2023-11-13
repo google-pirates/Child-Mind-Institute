@@ -6,6 +6,7 @@ from sklearn import preprocessing
 from datetime import datetime
 import pandas as pd
 import numpy as np
+import pickle
 import pyarrow as pa
 
 
@@ -65,6 +66,10 @@ def scale(data, config: Dict[str, str], scaler: object = None) -> None:
 
     data.loc[:, target_columns] = scaler.fit_transform(data.filter(items=target_columns))
 
+    with open(f'{config.get("general").get("log_dir")}/scaler.pickle', 'wb') as file:
+        pickle.dump(scaler, file)
+
+
 
 def to_list(data, window_size: int, config: Dict[str, str], step: int = 1, key: List[str] = ['series_id'], scaler: object = None) -> List[pd.DataFrame]:
     data = [datum[1] for datum in data.groupby(key)]
@@ -94,15 +99,15 @@ def to_list(data, window_size: int, config: Dict[str, str], step: int = 1, key: 
     slided_windows = np.concatenate(slided_windows, axis=1, dtype=np.float32)
 
     slided_windows_2 = []
-    for window_size in range(window_size, 0, -30):
+    for win_size in range(window_size, 0, -30):
         slided_window = [
             np.lib.stride_tricks.sliding_window_view(
                 datum.iloc[1:, start_of_feature_index:-1],
-                window_size,
-                axis=0)[120-window_size::step]
+                win_size,
+                axis=0)[window_size-win_size::step].mean(axis=-1)
             for datum
             in data]
-        slided_windows_2.append(np.concatenate(slided_window).mean(axis=-1))
+        slided_windows_2.append(np.concatenate(slided_window))
     slided_windows_2 = np.concatenate(slided_windows_2, axis=1, dtype=np.float32)
 
     return slided_windows, slided_windows_2
@@ -110,7 +115,7 @@ def to_list(data, window_size: int, config: Dict[str, str], step: int = 1, key: 
 
 def extract_keys(data, window_size: int, step: int = 1, key: List[str] = ['series_id']):
     return (
-        data.groupby(key).apply(lambda x: x.iloc[window_size-1:])
+        data.groupby(key).apply(lambda x: x.iloc[window_size:])
         .drop(columns=key)
         .reset_index()
         .drop(columns=[f'level_{len(key)}', 'anglez', 'enmo'])
