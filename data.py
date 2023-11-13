@@ -39,6 +39,7 @@ def preprocess(data, key: List[str] = ['series_id'], **kwargs) -> pd.DataFrame:
             utc=True)
         data.date = data.date.dt.date
         data.date = data.date.astype('datetime64[ns]')
+        data['hour'] = data.date.dt.hour
 
     if isinstance(data.date[0], datetime):
         data.date = (
