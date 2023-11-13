@@ -14,7 +14,7 @@ import os
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix
 
-from data import ChildInstituteDataset, preprocess, to_list
+from data import ChildInstituteDataset, preprocess, to_list, extract_keys
 from utils import make_logdir
 
 
@@ -226,6 +226,11 @@ def main(config):
     step = config.get('train').get('step')
 
     train_list = to_list(preprocessed_data, window_size, config, step)
+    train_keys = extract_keys(preprocessed_data, window_size, step)
+
+    for i, train_key in enumerate(train_keys):
+        train_key['X'] = train_list[i]
+    train_list = train_keys
 
     # train_data_list = []
     # valid_data_list = []
