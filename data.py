@@ -54,18 +54,20 @@ def preprocess(data, key: List[str] = ['series_id'], **kwargs) -> pd.DataFrame:
     return data
 
 
-def scale(data, config: Dict[str, str]) -> None:
+def scale(data, config: Dict[str, str], scaler: object = None) -> None:
     excluding_columnns = config.get('general').get('data').get('excluding_columns')
     target_columns = list(set(data.columns) - set(excluding_columnns))
-    scaler = getattr(preprocessing, config.get('train').get('data').get('scaler'))()
+
+    if scaler is None:
+        scaler = getattr(preprocessing, config.get('train').get('data').get('scaler'))()
 
     data.loc[:, target_columns] = scaler.fit_transform(data.filter(items=target_columns))
 
 
-def to_list(data, window_size: int, config: Dict[str, str], step: int = 1, key: List[str] = ['series_id']) -> List[pd.DataFrame]:
+def to_list(data, window_size: int, config: Dict[str, str], step: int = 1, key: List[str] = ['series_id'], scaler: object = None) -> List[pd.DataFrame]:
     data = [datum[1] for datum in data.groupby(key)]
     for datum in data:
-        scale(datum, config)
+        scale(datum, config, scaler)
 
     start_of_feature_index = np.where(data[0].columns.str.find('anglez') == 0)[0].item()
     slided_window = [
