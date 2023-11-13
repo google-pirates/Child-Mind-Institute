@@ -227,11 +227,11 @@ def main(config):
     window_size = int(config.get('train').get('window_size'))
     step = config.get('train').get('step')
 
-    train_list = to_list(preprocessed_data, window_size, config, step)
+    train_list, train_list2 = to_list(preprocessed_data, window_size, config, step)
     train_keys = extract_keys(preprocessed_data, window_size, step)
-
-    for i, train_key in enumerate(train_keys):
+    for i, train_key in enumerate(train_keys[1:]):
         train_key['X'] = train_list[i]
+        train_key['X1'] = train_list2[i]
     train_list = train_keys
 
     valid_set_size = config.get('train').get('valid_size', 0.2)
@@ -253,7 +253,8 @@ def main(config):
     example_batch = next(iter(train_dataloader))
     
     _, seq_len, n_features = example_batch['X'].shape
-    config['train'].update({'seq_len': seq_len, 'n_features': n_features})
+    _, seq_len, n_features1 = example_batch['X1'].shape
+    config['train'].update({'seq_len': seq_len, 'n_features': n_features, 'n_features1': n_features1})
 
     ### train ###
     model_name = config.get('train').get('model')

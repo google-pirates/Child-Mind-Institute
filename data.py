@@ -19,6 +19,7 @@ class ChildInstituteDataset(Dataset):
     def __getitem__(self, idx):
         return {
             'X': torch.from_numpy(self.data[idx].get('X')),
+            'X1': torch.from_numpy(self.data[idx].get('X1')),
             'y': torch.Tensor([self.data[idx].get('event')]),
             'series_id': self.data[idx].get('series_id'),
             'date': self.data[idx].get('date'),
@@ -75,7 +76,7 @@ def to_list(data, window_size: int, config: Dict[str, str], step: int = 1, key: 
 
     slided_window = [
         np.lib.stride_tricks.sliding_window_view(
-            datum.iloc[:, -1:],
+            datum.iloc[1:, -1:],
             window_size,
             axis=0)[::step]
         for datum
@@ -84,7 +85,7 @@ def to_list(data, window_size: int, config: Dict[str, str], step: int = 1, key: 
 
     slided_window = [
             np.lib.stride_tricks.sliding_window_view(
-                datum.diff().iloc[window_size-1:, start_of_feature_index:-1],
+                datum.diff().iloc[1:, start_of_feature_index:-1],
                 window_size,
                 axis=0)[::step]
             for datum
@@ -96,7 +97,7 @@ def to_list(data, window_size: int, config: Dict[str, str], step: int = 1, key: 
     for window_size in range(window_size, 0, -30):
         slided_window = [
             np.lib.stride_tricks.sliding_window_view(
-                datum.iloc[:, start_of_feature_index:-1],
+                datum.iloc[1:, start_of_feature_index:-1],
                 window_size,
                 axis=0)[120-window_size::step]
             for datum

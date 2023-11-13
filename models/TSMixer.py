@@ -76,11 +76,15 @@ class TSMixer(nn.Module):
 
         self.blocks = nn.ModuleList([ResBlock(config) for _ in range(self.n_block)])
 
+        self.dense = nn.Linear(self.n_features, 1)
         self.final_dense = nn.Linear(self.n_features, self.out_seq_len)
+
+        self.concat = nn.Linear(2, 1)
 
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
         x = batch.get('X')  # batch, seq_len, n_features
+        x1 = batch.get('X1')  # batch, seq_len, n_features
         if x is None:
             raise ValueError("Input 'X' is not found in the batch") ## TorchScript에서 Optional[Tensor] 를 트래킹하기 위함
 
@@ -94,4 +98,9 @@ class TSMixer(nn.Module):
         # x_out = self.final_dense(x_transposed)
         # x_out = x_out.transpose(1, 2)  # batch, seq_len, n_features
         x_selected = x[:, -1, :] ## 마지막 시간 단계를 이용하여 출력 생성
-        return self.final_dense(x_selected)
+        x_selected = self.final_dense(x_selected)
+
+        x1 = self.dense(x1)
+        out = self.concat(torch.cat([x_selected, x1], axis=-1))
+
+        return out
