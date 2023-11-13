@@ -5,4 +5,4 @@ general:
   tensorboard:
     path: './tensorboard'
   test_data:
-    save_path: ...
+    path: './data/merged_data.parquet'

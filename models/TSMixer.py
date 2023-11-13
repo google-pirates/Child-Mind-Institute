@@ -95,4 +95,3 @@ class TSMixer(nn.Module):
         # x_out = x_out.transpose(1, 2)  # batch, seq_len, n_features
         x_selected = x[:, -1, :] ## 마지막 시간 단계를 이용하여 출력 생성
         return self.final_dense(x_selected)
-    
