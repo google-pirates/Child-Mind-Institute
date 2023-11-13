@@ -1,12 +1,15 @@
-__pycache__/data.cpython-310.pyc
-__pycache__/inference.cpython-310.pyc
-__pycache__/train.cpython-310.pyc
-__pycache__/utils.cpython-310.pyc
-datas/merged_data.parquet
-models/__pycache__/cnn.cpython-310.pyc
-datas/testing.parquet
+# pyc
+*.pyc
+
+# jupyter
+*.ipynb
+
+# tensorboard
 tensorboard/
-models/__pycache__/lstm.cpython-310.pyc
-models/__pycache__/tsmixer.cpython-310.pyc
-test.ipynb
-data_eda.ipynb
+
+# extension
+*.parquet
+*.csv
+*.pickle
+*.zip
+*.7z

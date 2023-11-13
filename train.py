@@ -1,22 +1,22 @@
-import models
-
+# pylint: disable=no-member
 import copy
-import pandas as pd
-import numpy as np
+import os
 import pickle
-import torch
+
+import numpy as np
+import pandas as pd
+from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import train_test_split
+import torch
 from torch import nn, optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-import os
 from tqdm import tqdm
-from sklearn.metrics import confusion_matrix
 
-from data import ChildInstituteDataset, preprocess, to_list
+from data import ChildInstituteDataset, preprocess, to_list, extract_keys
 from utils import make_logdir
-
+import models
 
 def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
           valid_dataloader: DataLoader, writer) -> nn.Module:
@@ -109,7 +109,7 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
             predictions = (probabilities > 0.5).float()
             train_corrects += torch.sum(predictions == labels)
             train_total_samples += inputs.size(0)
-            train_confusion_matrix += confusion_matrix(labels, predictions)
+            train_confusion_matrix += confusion_matrix(labels.cpu().numpy(), predictions.cpu().numpy())
         avg_train_loss = training_loss / len(train_dataloader)
         train_losses.append(avg_train_loss)
         train_accuracy = train_corrects.double() / train_total_samples
@@ -154,7 +154,7 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
                 predictions = (probabilities > 0.5).float()
                 valid_corrects += torch.sum(predictions == labels)
                 valid_total_samples += inputs.size(0)
-                valid_confusion_matrix += confusion_matrix(labels, predictions)
+                valid_confusion_matrix += confusion_matrix(labels.cpu().numpy(), predictions.cpu().numpy())
         avg_valid_loss = valid_loss / len(valid_dataloader)
         valid_losses.append(avg_valid_loss)
 
@@ -219,6 +219,8 @@ def main(config):
     data_path = config.get('general').get('data').get('path')
 
     merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet
+    # merged_train_data = merged_train_data.iloc[::20]
+    merged_train_data['timestamp'] = pd.to_datetime(merged_train_data['timestamp'], format='%Y-%m-%d')
 
     preprocessed_data = preprocess(merged_train_data)
 
@@ -226,20 +228,13 @@ def main(config):
     step = config.get('train').get('step')
 
     train_list = to_list(preprocessed_data, window_size, config, step)
+    train_keys = extract_keys(preprocessed_data, window_size, step)
 
-    # train_data_list = []
-    # valid_data_list = []
+    for i, train_key in enumerate(train_keys):
+        train_key['X'] = train_list[i]
+    train_list = train_keys
 
-    ## train,test split 시 series_id 별로 split 할지,
-    ## 전체 데이터에 대해 split할지 결정 필요
-    ## 일단 series_id 별로 split 적용
-    ## define valid size from config. default = 0.2
     valid_set_size = config.get('train').get('valid_size', 0.2)
-
-    # for df in train_list:
-    #     train_df, valid_df = train_test_split(df, test_size=valid_set_size, shuffle=False)
-    #     train_data_list.append(train_df)
-    #     valid_data_list.append(valid_df)
 
     train_data_list, valid_data_list = train_test_split(train_list,
                                                         test_size=valid_set_size,
@@ -249,13 +244,14 @@ def main(config):
     train_dataset = ChildInstituteDataset(train_data_list)
     valid_dataset = ChildInstituteDataset(valid_data_list)
 
-    BATCH_SIZE = config.get('train').get('batch_size')
+    batch_size = config.get('train').get('batch_size')
     train_data_shuffle = config.get('train').get('data').get('shuffle')
-    train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=train_data_shuffle)
-    valid_dataloader = DataLoader(valid_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=train_data_shuffle)
+    valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
 
 
     example_batch = next(iter(train_dataloader))
+    
     _, seq_len, n_features = example_batch['X'].shape
     config['train'].update({'seq_len': seq_len, 'n_features': n_features})
 
