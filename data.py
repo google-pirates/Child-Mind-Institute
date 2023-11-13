@@ -70,16 +70,41 @@ def to_list(data, window_size: int, config: Dict[str, str], step: int = 1, key: 
     for datum in data:
         scale(datum, config, scaler)
 
+    slided_windows = []
     start_of_feature_index = np.where(data[0].columns.str.find('anglez') == 0)[0].item()
+
+    slided_window = [
+        np.lib.stride_tricks.sliding_window_view(
+            datum.iloc[:, -1:],
+            window_size,
+            axis=0)[::step]
+        for datum
+        in data]
+    slided_windows.append(np.concatenate(slided_window))
+
     slided_window = [
             np.lib.stride_tricks.sliding_window_view(
-                datum.iloc[:, start_of_feature_index:],
+                datum.diff().iloc[window_size-1:, start_of_feature_index:-1],
                 window_size,
                 axis=0)[::step]
             for datum
             in data]
+    slided_windows.append(np.concatenate(slided_window))
+    slided_windows = np.concatenate(slided_windows, axis=1, dtype=np.float32)
 
-    return np.concatenate(slided_window, dtype=np.float32)
+    slided_windows_2 = []
+    for window_size in range(window_size, 0, -30):
+        slided_window = [
+            np.lib.stride_tricks.sliding_window_view(
+                datum.iloc[:, start_of_feature_index:-1],
+                window_size,
+                axis=0)[120-window_size::step]
+            for datum
+            in data]
+        slided_windows_2.append(np.concatenate(slided_window).mean(axis=-1))
+    slided_windows_2 = np.concatenate(slided_windows_2, axis=1, dtype=np.float32)
+
+    return slided_windows, slided_windows_2
 
 
 def extract_keys(data, window_size: int, step: int = 1, key: List[str] = ['series_id']):
