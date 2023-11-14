@@ -1,6 +1,14 @@
-from typing import Dict, Any
+from typing import Dict, Any, List
 import torch
 import torch.nn as nn
+
+
+class Concat(nn.Module):
+    def __init__(self):
+        super(Concat, self).__init__()
+ 
+    def forward(self, x: List[torch.Tensor], axis: int):
+        return torch.cat(x, dim=axis)
 
 
 class ResBlock(nn.Module):
@@ -79,15 +87,16 @@ class TSMixer(nn.Module):
 
         self.dense = nn.Linear(self.n_features1, 2)
         self.activation = nn.LeakyReLU()
+        self.concat = Concat()
         self.final_dense = nn.Linear(self.n_features, self.out_seq_len)
 
-        self.concat = nn.Linear(3, 1)
+        self.out = nn.Linear(3, 1)
 
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
         x = batch.get('X')  # batch, seq_len, n_features
         x1 = batch.get('X1')  # batch, n_features
-        if x is None:
+        if (x is None) or (x1 is None):
             raise ValueError("Input 'X' is not found in the batch") ## TorchScript에서 Optional[Tensor] 를 트래킹하기 위함
 
         for block in self.blocks:
@@ -105,6 +114,8 @@ class TSMixer(nn.Module):
 
         x1 = self.dense(x1)
         x1 = self.activation(x1)
-        out = self.concat(torch.cat([x_selected, x1], axis=-1))
+
+        concat = self.concat([x_selected, x1], axis=-1)
+        out = self.out(concat)
 
         return out

@@ -1,6 +1,6 @@
 train:
   model: 'TSMixer'
-  learning_rate: 0.004
+  learning_rate: 0.001
   batch_size: 256
   window_size: 120
   random_seed: 42
@@ -13,7 +13,7 @@ train:
     name: 'BCEWithLogitsLoss'
     params:
       reduction: 'mean'
-  epochs: 1
+  epochs: 5
   patience: 5
   valid_size: 0.2
   scheduler: 'StepLR'
