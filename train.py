@@ -141,9 +141,10 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
             for batch in tqdm(valid_dataloader, desc='valid iter'):
                 ## data에서 X, y 정의
                 inputs = batch['X']
+                inputs1 = batch['X1']
                 labels = batch['y']
-                inputs, labels = inputs.to(device), labels.to(device)
-                outputs = model({'X': inputs, 'y': labels}) # [batch_size, 1]
+                inputs, inputs1, labels = inputs.to(device), inputs1.to(device), labels.to(device)
+                outputs = model({'X': inputs, 'X1': inputs1, 'y': labels}) # [batch_size, 1]
                 # outputs = outputs.squeeze()  # [batch_size, 1] -> [batch_size]
                 # labels = labels.squeeze()
 
