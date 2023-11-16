@@ -23,10 +23,12 @@ def inference(model_path: str, test_dataloader: DataLoader):
     with torch.no_grad():
         for batch in tqdm(test_dataloader, desc='Inference'):
             inputs = batch['X'].to(device)
+            inputs1 = batch['X1'].to(device)
             series_ids = batch['series_id']
+
             steps = batch['step'].cpu().numpy()
             dates = batch['date'].cpu().numpy()
-            outputs = model({'X': inputs})
+            outputs = model({'X': inputs, 'X1': inputs1})
 
             probabilities = torch.sigmoid(outputs)
             predictions = (probabilities > 0.5).float()
@@ -76,13 +78,15 @@ def main(config):
 
         preprocessed_series_data = preprocess(series_data)
 
-        test_list = to_list(preprocessed_series_data, window_size, config, step_size)
+        test_list, test_list2 = to_list(preprocessed_series_data, window_size, config, step_size)
         test_keys = extract_keys(preprocessed_series_data, window_size, step_size)
 
         for i, key in enumerate(test_keys):
             key['X'] = test_list[i]
+            key['X1'] = test_list2[i]
+        test_list = test_keys
 
-        test_dataset = ChildInstituteDataset(test_keys)
+        test_dataset = ChildInstituteDataset(test_list)
         test_dataloader = DataLoader(test_dataset,
                                      batch_size=config['inference']['batch_size'],
                                      shuffle=False,
@@ -90,12 +94,15 @@ def main(config):
 
         submission = inference(model_path=config.get('general').get('checkpoint'),
                             test_dataloader=test_dataloader)
-        
-        submission['event'] = submission['event'].rolling(window=1000, min_periods=1, center=True).mean().apply(
+
+        submission['event'] = submission['event'].rolling(window=500, min_periods=1, center=True).mean().apply(
             lambda x: 1 if x > 0.5 else (0 if pd.notnull(x) else np.nan)
         )
-        submission = reverse_events_if_below_min_count(submission, 1000)
-        submission['event'] = submission['event'].map({0: 'onset', 1: 'wakeup'})
+
+        submission = filter_event(submission, 10)
+
+        submission = reverse_events_if_below_min_count(submission, 500)
+        submission['event'] = submission['event'].map({0: 'wakeup', 1: 'onset'})
 
         ##
         first_rows = submission.groupby('series_id').head(1)
@@ -105,7 +112,7 @@ def main(config):
         changed_events = submission[submission['event_change']]
         submission = pd.concat([first_rows, changed_events]).drop_duplicates().sort_values(['series_id', 'step'])
         submission = submission.drop(columns=['event_change'])
-        ##
+        #
 
         all_submissions.append(submission)
     if all_submissions:
@@ -114,14 +121,14 @@ def main(config):
         final_submission = pd.DataFrame(columns=['row_id', 'series_id', 'step', 'event', 'score'])
 
     final_submission['score'] = final_submission['score'].astype(float)
-
-    final_submission['score'] = np.where( final_submission['event'] == 'onset',
-                                         (final_submission['score']),
-                                         (1-final_submission['score']))
+    final_submission['score'] = final_submission['score'] / 10
+    # final_submission['score'] = np.where( final_submission['event'] == 'onset',
+    #                                      (final_submission['score']),
+    #                                      (1-final_submission['score']))
 
     final_submission = final_submission.sort_values(['series_id', 'step']).reset_index(drop=True)
     final_submission['row_id'] = final_submission.index.astype(int)
-    final_submission = final_submission[['row_id', 'series_id', 'date','step', 'event', 'score']]
+    final_submission = final_submission[['row_id', 'series_id', 'date', 'step', 'event', 'score']]
 
     final_submission.to_csv('submission.csv', index=False, float_format='%.5f')
     return final_submission
@@ -144,3 +151,27 @@ def reverse_events_if_below_min_count(submission: pd.DataFrame, min_count: int) 
     submission = submission.drop(columns=['change_point'])
 
     return submission
+
+def filter_event(df, change_count):
+    df = df.copy()
+    df['event_change'] = (df['event'] != df.groupby(['series_id', 'date'])['event'].shift(1))
+    change_counts = df.groupby(['series_id', 'date'])['event_change'].sum()
+    filtered_ids = change_counts[change_counts >= change_count].index
+    df.loc[(df['series_id'].isin(filtered_ids.get_level_values(0))) & (df['date'].isin(filtered_ids.get_level_values(1))), 'event'] = -1
+    df = df.drop(columns='event_change')
+    return df
+
+
+def roll_apply_percentage(submission, window_size, min_percentage):
+    # Define a function to apply for each window
+    def apply_func(x):
+        counts = x.value_counts(normalize=True)
+        if counts.get(1, 0) >= min_percentage:
+            return 1
+        elif counts.get(0, 0) >= min_percentage:
+            return 0
+        else:
+            return -1
+    submission['event'] = submission['event'].rolling(window=window_size, center=True).apply(apply_func).fillna(-1)
+    return submission
+

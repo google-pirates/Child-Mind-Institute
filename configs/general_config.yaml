@@ -5,4 +5,5 @@ general:
   tensorboard:
     path: './tensorboard'
   test_data:
-    path: './data/merged_data.parquet'
+    path: './data/Zzzs_train.parquet'
+  log_dir: './tensorboard/acc,step=2,window_size=120,batch_size=256,lr=0.001,RADam/version_0/'
