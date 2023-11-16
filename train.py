@@ -226,15 +226,19 @@ def main(config):
 
     ## train data merge
     data_path = config.get('general').get('data').get('path')
+    window_size = config.get('train').get('window_size')
 
     merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet
-
-    merged_train_data.loc[merged_train_data.duplicated(subset=['series_id', 'date', 'event'], keep='last'), 'event'] = np.nan
-    merged_train_data.event = merged_train_data.event.fillna(2.0)
+    temp = merged_train_data.groupby('series_id').enmo.rolling(window_size).mean().fillna(method='bfill').to_frame().reset_index().rename(columns={'level_1': 'step', 'enmo': 'rolling_enmo'})
+    merged_train_data = merged_train_data.merge(temp, on=['series_id', 'step'])
+    merged_train_data.loc[((merged_train_data.rolling_enmo < 0.01) & (merged_train_data.event==0)), 'event'] = 2
+    
     labels = np.zeros(shape=((len(merged_train_data), 3)))
     labels[merged_train_data.event==0, 0] = 1
     labels[merged_train_data.event==1, 1] = 1
     labels[merged_train_data.event==2, 2] = 1
+    
+    merged_train_data = merged_train_data.drop(columns=['rolling_enmo'])
 
     preprocessed_data = preprocess(merged_train_data)
 
