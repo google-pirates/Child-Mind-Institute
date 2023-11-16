@@ -230,6 +230,8 @@ def main(config):
 
     merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet
     temp = merged_train_data.groupby('series_id').enmo.rolling(window_size).mean().fillna(method='bfill').to_frame().reset_index().rename(columns={'level_1': 'step', 'enmo': 'rolling_enmo'})
+    temp = pd.concat([datum.reset_index(drop=True).reset_index() for _, datum in temp.groupby('series_id')]).drop(columns=['step']).rename(columns={'index': 'step'})
+    temp.step += (window_size-1)
     merged_train_data = merged_train_data.merge(temp, on=['series_id', 'step'])
     merged_train_data.loc[((merged_train_data.rolling_enmo < 0.01) & (merged_train_data.event==0)), 'event'] = 2
     
