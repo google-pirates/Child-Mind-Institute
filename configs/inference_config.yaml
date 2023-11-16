@@ -1,4 +1,4 @@
 inference:
-  batch_size: 64
-  window_size: 120
+  batch_size: 32
+  window_size: 20
   step: 1

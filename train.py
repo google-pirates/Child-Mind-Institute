@@ -112,7 +112,7 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
             ## accuracy 추가
             labels = labels.argmax(dim=-1).cpu()
             predictions = F.softmax(outputs).argmax(dim=-1).float()
-            train_corrects += torch.sum(predictions == labels.argmax(dim=-1))
+            train_corrects += torch.sum(predictions == labels)
             train_total_samples += inputs.size(0)
             
             train_total_predictions.extend(predictions.cpu().tolist())
@@ -133,7 +133,7 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
         valid_loss = 0.0
         valid_corrects = 0
         valid_total_samples = 0
-        valid_confusion_matrix = np.zeros((2, 2), dtype=np.float32)
+        # valid_confusion_matrix = np.zeros((2, 2), dtype=np.float32)
         with torch.no_grad():
             for batch in tqdm(valid_dataloader, desc='valid iter'):
                 ## data에서 X, y 정의
@@ -187,20 +187,17 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
 
         else:
             patience_count += 1
-        
         # prevent overfitting
         if patience_count > patience:
             break
-        
         train_results = np.array(
             [re.sub(' {2,}', ' ', i.strip()).split()[1:-1] for i in classification_report(train_total_labels, train_total_predictions).split('\n')[2:5]],
             dtype=np.float16)
         valid_results = np.array(
-            [re.sub(' {2,}', ' ', i.strip()).split()[1:-1] for i in classification_report(train_total_labels, train_total_predictions).split('\n')[2:5]],
+            [re.sub(' {2,}', ' ', i.strip()).split()[1:-1] for i in classification_report(valid_total_labels, valid_total_predictions).split('\n')[2:5]],
             dtype=np.float16)
-        
         print('Train')
-        for i, train_result in enumerate(train_results):            
+        for i, train_result in enumerate(train_results):       
             print(f"[Final] [label {i}] "
                 f"Precision: {train_result[0]:.04f} | "
                 f"Recall: {train_result[1]:.04f} | "
@@ -231,8 +228,8 @@ def main(config):
     merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet
     temp = merged_train_data.groupby('series_id').enmo.rolling(window_size).mean().fillna(method='bfill').to_frame().reset_index().rename(columns={'level_1': 'step', 'enmo': 'rolling_enmo'})
     merged_train_data = merged_train_data.merge(temp, on=['series_id', 'step'])
-    merged_train_data.loc[((merged_train_data.rolling_enmo < 0.01) & (merged_train_data.event==0)), 'event'] = 2
-    
+    merged_train_data.loc[((merged_train_data.rolling_enmo < 0.15) & (merged_train_data.event==0)), 'event'] = 2
+
     labels = np.zeros(shape=((len(merged_train_data), 3)))
     labels[merged_train_data.event==0, 0] = 1
     labels[merged_train_data.event==1, 1] = 1
