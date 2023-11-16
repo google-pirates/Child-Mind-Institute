@@ -1,7 +1,7 @@
 general:
   data:
     path: './data/merged_data.parquet'
-    excluding_columns: ['series_id', 'timestamp', 'step', 'night', 'event']
+    excluding_columns: ['series_id', 'date', 'step', 'night', 'event']
   tensorboard:
     path: './tensorboard'
   test_data:

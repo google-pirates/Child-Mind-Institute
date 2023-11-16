@@ -5,8 +5,10 @@ import pickle
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import confusion_matrix
+import re
+from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
+import torch.nn.functional as F
 import torch
 from torch import nn, optim
 import torch.optim.lr_scheduler as lr_scheduler
@@ -17,6 +19,7 @@ from tqdm import tqdm
 from data import ChildInstituteDataset, preprocess, to_list, extract_keys
 from utils import make_logdir
 import models
+
 
 def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
           valid_dataloader: DataLoader, writer) -> nn.Module:
@@ -81,6 +84,10 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
     # for tensorboard logging
     train_losses = []
     valid_losses = []
+    train_total_predictions = []
+    train_total_labels = []
+    valid_total_predictions = []
+    valid_total_labels = []
 
     for epoch in tqdm(range(num_epochs), desc='epoch'):
         # Training phase
@@ -88,16 +95,14 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
         training_loss = 0.0
         train_corrects = 0
         train_total_samples = 0
-        train_confusion_matrix = np.zeros((2, 2), dtype=np.int64)
+        # train_confusion_matrix = np.zeros((2, 2), dtype=np.float32)
         for batch in tqdm(train_dataloader, desc='train iter'):
             ## data에서 X, y 정의
             inputs = batch['X']
-            labels = batch['y']
+            labels = batch['y'].reshape(inputs.shape[0], -1)
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model({'X': inputs, 'y': labels}) # [batch_size, 1]
-            # outputs = outputs.squeeze()  # [batch_size, 1] -> [batch_size]
-            # labels = labels.squeeze()
 
             loss = criterion(outputs, labels)
             loss.backward()
@@ -105,77 +110,60 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
             training_loss += loss.item()
 
             ## accuracy 추가
-            probabilities = torch.sigmoid(outputs)
-            predictions = (probabilities > 0.5).float()
-            train_corrects += torch.sum(predictions == labels)
+            labels = labels.argmax(dim=-1).cpu()
+            predictions = F.softmax(outputs).argmax(dim=-1).float()
+            train_corrects += torch.sum(predictions == labels.argmax(dim=-1))
             train_total_samples += inputs.size(0)
-            train_confusion_matrix += confusion_matrix(labels.cpu().numpy(), predictions.cpu().numpy())
+            
+            train_total_predictions.extend(predictions.cpu().tolist())
+            train_total_labels.extend(labels.tolist())
+            
         avg_train_loss = training_loss / len(train_dataloader)
         train_losses.append(avg_train_loss)
         train_accuracy = train_corrects.double() / train_total_samples
 
-        tn, fp, fn, tp = train_confusion_matrix.ravel()
-        training_recall = tp / (tp+fn)
-        training_precision = tp / (tp+fp)
-
         print(f"[Epoch {epoch + 1}/{num_epochs}] "
               f"Training Loss: {avg_train_loss:.04f} | "
-              f"Training Accuracy: {train_accuracy:.04f} | "
-              f"Training Recall: {training_recall:.04f} | "
-              f"Training Precision: {training_precision:.04f} | "
-              f"Training F1: {2*(training_recall*training_precision)/(training_recall+training_precision):.04f} | ")
+              f"Training Accuracy: {train_accuracy:.04f} | ")
         writer.add_scalar('Loss/train', avg_train_loss, epoch)
         writer.add_scalar('Accuracy/train', train_accuracy, epoch)
-        writer.add_scalar('Recall/train', training_recall, epoch)
-        writer.add_scalar('Precision/train', training_precision, epoch)
-        writer.add_scalar('F1/train', 2*(training_recall*training_precision)/(training_recall+training_precision), epoch)
 
         # Validation phase
         model.eval()
         valid_loss = 0.0
         valid_corrects = 0
         valid_total_samples = 0
-        valid_confusion_matrix = np.zeros((2, 2), dtype=np.int64)
+        valid_confusion_matrix = np.zeros((2, 2), dtype=np.float32)
         with torch.no_grad():
             for batch in tqdm(valid_dataloader, desc='valid iter'):
                 ## data에서 X, y 정의
                 inputs = batch['X']
-                labels = batch['y']
+                labels = batch['y'].reshape(inputs.shape[0], -1)
                 inputs, labels = inputs.to(device), labels.to(device)
                 outputs = model({'X': inputs, 'y': labels}) # [batch_size, 1]
-                # outputs = outputs.squeeze()  # [batch_size, 1] -> [batch_size]
-                # labels = labels.squeeze()
 
                 loss = criterion(outputs, labels)
                 valid_loss += loss.item()
 
                 ## accuracy 추가
-                probabilities = torch.sigmoid(outputs)
-                predictions = (probabilities > 0.5).float()
-                valid_corrects += torch.sum(predictions == labels)
+                labels = labels.argmax(dim=-1).cpu()
+                predictions = F.softmax(outputs).argmax(dim=-1).float()
+                valid_corrects += torch.sum(predictions == labels.argmax(dim=-1))
                 valid_total_samples += inputs.size(0)
-                valid_confusion_matrix += confusion_matrix(labels.cpu().numpy(), predictions.cpu().numpy())
+                
+                valid_total_predictions.extend(predictions.cpu().tolist())
+                valid_total_labels.extend(labels.tolist())
+
         avg_valid_loss = valid_loss / len(valid_dataloader)
         valid_losses.append(avg_valid_loss)
-
         valid_accuracy = valid_corrects.double() / valid_total_samples
-
-        tn, fp, fn, tp = valid_confusion_matrix.ravel()
-        valid_recall = tp / (tp+fn)
-        valid_precision = tp / (tp+fp)
 
         print(f"[Epoch {epoch + 1}/{num_epochs}] "
               f"Validation Loss: {avg_valid_loss:.04f} | "
-              f"Validation Accuracy: {valid_accuracy:.04f} | "
-              f"Validation Recall: {valid_recall:.04f} | "
-              f"Validation Precision: {valid_precision:.04f} | "
-              f"Validation F1: {2*(valid_recall*valid_precision)/(valid_recall+valid_precision):.04f} | ")
+              f"Validation Accuracy: {valid_accuracy:.04f} | ")
 
         writer.add_scalar('Loss/valid', avg_valid_loss, epoch)
         writer.add_scalar('Accuracy/valid', valid_accuracy, epoch)
-        writer.add_scalar('Recall/valid', valid_recall, epoch)
-        writer.add_scalar('Precision/valid', valid_precision, epoch)
-        writer.add_scalar('F1/valid', 2*(valid_recall*valid_precision)/(valid_recall+valid_precision), epoch)
 
         # ReduceLROnPlateau를 사용하지 않는 경우 lr 업데이트 & 로깅
         if isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
@@ -203,6 +191,27 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
         # prevent overfitting
         if patience_count > patience:
             break
+        
+        train_results = np.array(
+            [re.sub(' {2,}', ' ', i.strip()).split()[1:-1] for i in classification_report(train_total_labels, train_total_predictions).split('\n')[2:5]],
+            dtype=np.float16)
+        valid_results = np.array(
+            [re.sub(' {2,}', ' ', i.strip()).split()[1:-1] for i in classification_report(train_total_labels, train_total_predictions).split('\n')[2:5]],
+            dtype=np.float16)
+        
+        print('Train')
+        for i, train_result in enumerate(train_results):            
+            print(f"[Final] [label {i}] "
+                f"Precision: {train_result[0]:.04f} | "
+                f"Recall: {train_result[1]:.04f} | "
+                f"F1: {train_result[2]:.04f} | ")
+
+        print('Validation')
+        for i, valid_result in enumerate(valid_results):            
+            print(f"[Final] [label {i}] "
+                f"Precision: {valid_result[0]:.04f} | "
+                f"Recall: {valid_result[0]:.04f} | "
+                f"F1: {valid_result[2]:.04f} | ")
 
     return scripted_model
 
@@ -219,8 +228,13 @@ def main(config):
     data_path = config.get('general').get('data').get('path')
 
     merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet
-    # merged_train_data = merged_train_data.iloc[::20]
-    merged_train_data['timestamp'] = pd.to_datetime(merged_train_data['timestamp'], format='%Y-%m-%d')
+
+    merged_train_data.loc[merged_train_data.duplicated(subset=['series_id', 'date', 'event'], keep='last'), 'event'] = np.nan
+    merged_train_data.event = merged_train_data.event.fillna(2.0)
+    labels = np.zeros(shape=((len(merged_train_data), 3)))
+    labels[merged_train_data.event==0, 0] = 1
+    labels[merged_train_data.event==1, 1] = 1
+    labels[merged_train_data.event==2, 2] = 1
 
     preprocessed_data = preprocess(merged_train_data)
 
@@ -232,6 +246,7 @@ def main(config):
 
     for i, train_key in enumerate(train_keys):
         train_key['X'] = train_list[i]
+        train_key['event'] = labels[i]
     train_list = train_keys
 
     valid_set_size = config.get('train').get('valid_size', 0.2)
