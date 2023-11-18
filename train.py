@@ -18,6 +18,15 @@ from data import ChildInstituteDataset, preprocess, to_list, extract_keys
 from utils import make_logdir
 import models
 
+def calculate_class_weights(train_dataloader):
+    label_counts = torch.zeros(2) 
+    for batch in train_dataloader:
+        labels = batch['y']
+        label_counts += torch.bincount(labels, minlength=2)
+
+    class_weights = 1.0 / label_counts
+    return class_weights[1]
+
 def smooth_label(labels, max_increase=0.45, max_decrease=0.55):
     smoothed_labels = labels.copy()
     n = len(labels)
@@ -61,6 +70,11 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
     criterion_config = config.get('train').get('criterion', {})
     criterion_name = criterion_config.get('name')
     criterion_params = criterion_config.get('params', {})
+
+    ## Weighted label Loss
+    pos_weight = calculate_class_weights(train_dataloader)
+    criterion_params['pos_weight'] = pos_weight
+
     criterion_class = getattr(nn, criterion_name, None)
     if criterion_class is None:
         raise ValueError(f"Criterion {criterion_name} not found in torch.nn")

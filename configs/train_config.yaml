@@ -1,10 +1,10 @@
 train:
   model: 'TSMixer'
-  learning_rate: 0.01
-  batch_size: 64
-  window_size: 120
+  learning_rate: 0.005
+  batch_size: 32
+  window_size: 60
   random_seed: 42
-  step: 1
+  step: 5
   data:
     scaler: 'StandardScaler'
     shuffle: 'False'
