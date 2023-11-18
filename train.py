@@ -18,6 +18,32 @@ from data import ChildInstituteDataset, preprocess, to_list, extract_keys
 from utils import make_logdir
 import models
 
+def smooth_label(labels, max_increase=0.45, max_decrease=0.55):
+    smoothed_labels = labels.copy()
+    n = len(labels)
+
+    change_points = [0] + [i for i in range(1, n) if labels[i] != labels[i-1]] + [n]
+
+    for i in range(len(change_points) - 1):
+        start = change_points[i]
+        end = change_points[i + 1]
+
+        if labels[start] == 0:
+            step = max_increase / (end - start)
+            value = 0
+            for j in range(start, end):
+                smoothed_labels[j] = min(value, 1)  # 라벨이 1을 초과하지 않도록
+                value += step
+        else:
+            step = max_decrease / (end - start)
+            value = 1
+            for j in range(start, end):
+                smoothed_labels[j] = max(value, 0)  # 라벨이 0 미만이 되지 않도록
+                value -= step
+
+    return smoothed_labels
+
+
 def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
           valid_dataloader: DataLoader, writer) -> nn.Module:
     torch.manual_seed(config.get('train').get('random_seed'))
@@ -86,7 +112,7 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
             optimizer.zero_grad()
             outputs = model({'X': inputs, 'X1': inputs1, 'y': labels}) # [batch_size, 1]
 
-            smoothed_labels = labels * (1-0.1) + 0.5*0.1
+            smoothed_labels = smooth_label(labels, 0.3, 0.7)
             loss = criterion(outputs, smoothed_labels)
             loss.backward()
             optimizer.step()
