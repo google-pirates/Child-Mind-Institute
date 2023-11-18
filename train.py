@@ -19,7 +19,7 @@ from utils import make_logdir
 import models
 
 def calculate_class_weights(train_dataloader):
-    label_counts = torch.zeros(2) 
+    label_counts = torch.zeros(2)
     for batch in train_dataloader:
         labels = batch['y']
         label_counts += torch.bincount(labels, minlength=2)
@@ -27,7 +27,7 @@ def calculate_class_weights(train_dataloader):
     class_weights = 1.0 / label_counts
     return class_weights[1]
 
-def smooth_label(labels, max_increase=0.45, max_decrease=0.55):
+def smooth_label(labels, max_increase, max_decrease):
     smoothed_labels = labels.copy()
     n = len(labels)
 
@@ -248,7 +248,7 @@ def main(config):
 
     merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet
     # merged_train_data = merged_train_data.iloc[::20]
-    # merged_train_data['timestamp'] = pd.to_datetime(merged_train_data['timestamp'], format='%Y-%m-%d')
+    merged_train_data['timestamp'] = pd.to_datetime(merged_train_data['timestamp'], format='%Y-%m-%d')
 
     preprocessed_data = preprocess(merged_train_data)
 
