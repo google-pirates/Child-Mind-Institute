@@ -194,7 +194,7 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
         if valid_loss < best_loss:
             best_loss = valid_loss
             best_model = copy.deepcopy(model).cpu()
-            scripted_model = torch.jit.script(best_model)
+            scripted_model = torch.jit.trace(best_model, {'X': inputs, 'y': labels, 'series_id': series_id})
             torch.jit.save(scripted_model, model_save_path)
             print(f"Best model saved to {model_save_path}")
 
@@ -221,7 +221,7 @@ def main(config):
     ## train data merge
     data_path = config.get('general').get('data').get('path')
 
-    merged_train_data = pd.read_parquet(data_path).iloc[:10000] ## merged_data.parquet    
+    merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet
     preprocessed_data = preprocess(merged_train_data)
 
     window_size = int(config.get('train').get('window_size'))

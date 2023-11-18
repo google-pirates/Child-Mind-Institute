@@ -1,6 +1,7 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class Concat(nn.Module):
@@ -88,13 +89,14 @@ class TSMixer(nn.Module):
 
         self.concat = Concat()
         self.embedding = nn.Embedding(self.num_series_id, self.embedding_dim)
-        self.final_dense = nn.Linear(self.n_features+self.embedding_dim, self.out_seq_len)
+        self.final_dense = nn.Linear(self.n_features+self.embedding_dim, self.out_seq_len)        
 
-
-    def forward(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
+    def forward(self, batch: Dict[str, Optional[torch.Tensor]]) -> torch.Tensor:
         x = batch.get('X')  # batch, seq_len, n_features
         series_id = batch.get('series_id')
+
         embedded_series_id = self.embedding(series_id)
+
         if x is None:
             raise ValueError("Input 'X' is not found in the batch") ## TorchScript에서 Optional[Tensor] 를 트래킹하기 위함
 
@@ -104,10 +106,8 @@ class TSMixer(nn.Module):
         if self.target_slice is not None:
             x = x[:, :, self.target_slice]
 
-        # x_transposed = x.transpose(1, 2)  # batch, n_features, seq_len
-        # x_out = self.final_dense(x_transposed)
-        # x_out = x_out.transpose(1, 2)  # batch, seq_len, n_features
         x_selected = x[:, -1, :] ## 마지막 시간 단계를 이용하여 출력 생성
+        
         concat = self.concat([x_selected, embedded_series_id], axis=-1)
 
         return self.final_dense(concat)
