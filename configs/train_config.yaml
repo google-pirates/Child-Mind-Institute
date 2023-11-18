@@ -4,7 +4,7 @@ train:
   batch_size: 32
   window_size: 60
   random_seed: 42
-  step: 5
+  step: 1
   data:
     scaler: 'StandardScaler'
     shuffle: 'False'
