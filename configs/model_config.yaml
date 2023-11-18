@@ -23,7 +23,8 @@ model:
     out_seq_len: 1
     n_block: 10
     # target_slice: [1]
+    embedding_dim: 64
     normalization: 'LayerNorm'
     dropout_rates: 0.4
-    ff_dim: 10
+    ff_dim: 64
     activation: 'ReLU'

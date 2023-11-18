@@ -93,9 +93,10 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
             ## data에서 X, y 정의
             inputs = batch['X']
             labels = batch['y']
-            inputs, labels = inputs.to(device), labels.to(device)
+            series_id = batch['series_id']
+            inputs, labels, series_id = inputs.to(device), labels.to(device), series_id.to(device)
             optimizer.zero_grad()
-            outputs = model({'X': inputs, 'y': labels}) # [batch_size, 1]
+            outputs = model({'X': inputs, 'y': labels, 'series_id': series_id}) # [batch_size, 1]
             # outputs = outputs.squeeze()  # [batch_size, 1] -> [batch_size]
             # labels = labels.squeeze()
 
@@ -218,7 +219,7 @@ def main(config):
     ## train data merge
     data_path = config.get('general').get('data').get('path')
 
-    merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet    
+    merged_train_data = pd.read_parquet(data_path).iloc[:10000] ## merged_data.parquet    
     preprocessed_data = preprocess(merged_train_data)
 
     window_size = int(config.get('train').get('window_size'))
@@ -248,9 +249,10 @@ def main(config):
 
 
     example_batch = next(iter(train_dataloader))
-    
+ 
     _, seq_len, n_features = example_batch['X'].shape
-    config['train'].update({'seq_len': seq_len, 'n_features': n_features})
+    num_series_id = len(merged_train_data.series_id.unique())
+    config['train'].update({'seq_len': seq_len, 'n_features': n_features, 'num_series_id': num_series_id})
 
     ### train ###
     model_name = config.get('train').get('model')
