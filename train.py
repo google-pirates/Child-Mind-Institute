@@ -219,7 +219,7 @@ def main(config):
     ## train data merge
     data_path = config.get('general').get('data').get('path')
 
-    merged_train_data = pd.read_parquet(data_path).iloc[:10000] ## merged_data.parquet    
+    merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet    
     preprocessed_data = preprocess(merged_train_data)
 
     window_size = int(config.get('train').get('window_size'))
