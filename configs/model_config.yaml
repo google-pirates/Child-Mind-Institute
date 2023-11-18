@@ -27,4 +27,4 @@ model:
     normalization: 'LayerNorm'
     dropout_rates: 0.4
     ff_dim: 64
-    activation: 'ReLU'
+    activation: 'LeakyReLU'
