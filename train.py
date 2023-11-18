@@ -27,7 +27,7 @@ def calculate_class_weights(train_dataloader):
     class_weights = 1.0 / label_counts
     return class_weights[1]
 
-def smooth_label(labels, max_increase, max_decrease):
+def smooth_label(labels, step_val):
     smoothed_labels = labels.copy()
     n = len(labels)
 
@@ -38,13 +38,13 @@ def smooth_label(labels, max_increase, max_decrease):
         end = change_points[i + 1]
 
         if labels[start] == 0:
-            step = max_increase / (end - start)
+            step = step_val / (end - start)
             value = 0
             for j in range(start, end):
                 smoothed_labels[j] = min(value, 1)  # 라벨이 1을 초과하지 않도록
                 value += step
         else:
-            step = max_decrease / (end - start)
+            step = step_val / (end - start)
             value = 1
             for j in range(start, end):
                 smoothed_labels[j] = max(value, 0)  # 라벨이 0 미만이 되지 않도록
@@ -126,7 +126,7 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
             optimizer.zero_grad()
             outputs = model({'X': inputs, 'X1': inputs1, 'y': labels}) # [batch_size, 1]
 
-            smoothed_labels = smooth_label(labels, 0.3, 0.7)
+            smoothed_labels = smooth_label(labels, 0.3)
             loss = criterion(outputs, smoothed_labels)
             loss.backward()
             optimizer.step()
