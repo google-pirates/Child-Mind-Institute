@@ -20,18 +20,6 @@ import models
 
 def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
           valid_dataloader: DataLoader, writer) -> nn.Module:
-    """
-    Train model, save and return best model.
-
-    Parameters:
-    - config (dict): Configuration dictionary.
-    - model (nn.Module): Model to train.
-    - train_dataloader (DataLoader): DataLoader for train data.
-    - valid_dataloader (DataLoader): DataLoader for validation data.
-
-    Returns:
-    - nn.Module: The model based on lowest valid loss.
-    """
     torch.manual_seed(config.get('train').get('random_seed'))
 
     model_save_dir = os.path.join(writer.log_dir, 'saved_models') 
@@ -97,10 +85,9 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
             inputs, inputs1, labels = inputs.to(device), inputs1.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model({'X': inputs, 'X1': inputs1, 'y': labels}) # [batch_size, 1]
-            # outputs = outputs.squeeze()  # [batch_size, 1] -> [batch_size]
-            # labels = labels.squeeze()
 
-            loss = criterion(outputs, labels)
+            smoothed_labels = labels * (1-0.1) + 0.5*0.1
+            loss = criterion(outputs, smoothed_labels)
             loss.backward()
             optimizer.step()
             training_loss += loss.item()
@@ -145,8 +132,6 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
                 labels = batch['y']
                 inputs, inputs1, labels = inputs.to(device), inputs1.to(device), labels.to(device)
                 outputs = model({'X': inputs, 'X1': inputs1, 'y': labels}) # [batch_size, 1]
-                # outputs = outputs.squeeze()  # [batch_size, 1] -> [batch_size]
-                # labels = labels.squeeze()
 
                 loss = criterion(outputs, labels)
                 valid_loss += loss.item()
