@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import numpy as np
+import pickle
 
 from data import ChildInstituteDataset, preprocess, to_list, extract_keys
 
@@ -27,7 +28,7 @@ def inference(model_path: str, test_dataloader: DataLoader):
 
             steps = batch['step'].cpu().numpy()
             dates = batch['date'].cpu().numpy()
-            outputs = model({'X': inputs})
+            outputs = model({'X': inputs, 'series_id': series_ids})
 
             probabilities = torch.sigmoid(outputs)
             predictions = (probabilities > 0.5).float()
@@ -57,22 +58,29 @@ def inference(model_path: str, test_dataloader: DataLoader):
 
 
 def main(config):
+
+    with open('/kaggle/input/models/id_map.pickle', 'rb') as handle:
+        id_map = pickle.load(handle)
+    reverse_id_map = {v: k for k, v in id_map.items()}
+
     # Load preprocessed data for inference
     test_data_path = config.get('general').get('test_data').get('path')
 
     test_data = pd.read_parquet(test_data_path)
-    test_data = test_data.query('series_id=="08db4255286f"')
     test_data['event'] = -1
     test_data = test_data[['series_id', 'timestamp', 'step', 'event', 'anglez', 'enmo']]
     # test_data['timestamp'] = pd.to_datetime(test_data['timestamp'], format='%Y-%m-%d')
+    
     test_data['anglez'] = np.sin(test_data['anglez'])
-    window_size = config.get('inference').get('window_size')
-    # step_size = config.get('inference').get('step')
 
+    window_size = config.get('inference').get('window_size')
+
+    test_data['series_id'] = test_data['series_id'].map(id_map)
     unique_series_ids = test_data['series_id'].unique()
     all_submissions = []
 
     for series_id in unique_series_ids:
+        print('Series_id: ', series_id)
         series_data = test_data[test_data['series_id'] == series_id].copy()
         series_data.reset_index(drop=True, inplace=True)
 
@@ -93,22 +101,25 @@ def main(config):
 
         submission = inference(model_path=config.get('general').get('checkpoint'),
                             test_dataloader=test_dataloader)
+        submission['series_id'] = submission['series_id'].map(reverse_id_map)
         
+        submission = reverse_events_by_step(submission, 0, 360)
+        submission = reverse_events_by_step(submission, 1, 360)
 #         submission['event'] = submission['event'].rolling(window=500, min_periods=1, center=True).mean().apply(
 #             lambda x: 1 if x > 0.5 else (0 if pd.notnull(x) else np.nan)
 #         )
-#         submission = reverse_events_if_below_min_count(submission, 500)
-#         submission['event'] = submission['event'].map({0: 'wakeup', 1: 'onset'})
 
+        submission['event'] = submission['event'].map({0: 'onset', 1: 'wakeup'})
+
+        #
+        first_rows = submission.groupby('series_id').head(1)
+        submission['event_change'] = submission['event'] != submission['event'].shift(1)
+        submission.loc[0, 'event_change'] = False
+
+        changed_events = submission[submission['event_change']]
+        submission = pd.concat([first_rows, changed_events]).drop_duplicates().sort_values(['series_id', 'step'])
+        submission = submission.drop(columns=['event_change'])
         ##
-#         first_rows = submission.groupby('series_id').head(1)
-#         submission['event_change'] = submission['event'] != submission['event'].shift(1)
-#         submission.loc[0, 'event_change'] = False
-
-#         changed_events = submission[submission['event_change']]
-#         submission = pd.concat([first_rows, changed_events]).drop_duplicates().sort_values(['series_id', 'step'])
-#         submission = submission.drop(columns=['event_change'])
-#         ##
 
         all_submissions.append(submission)
     if all_submissions:
@@ -124,13 +135,14 @@ def main(config):
 
     final_submission = final_submission.sort_values(['series_id', 'step']).reset_index(drop=True)
     final_submission['row_id'] = final_submission.index.astype(int)
-    final_submission = final_submission[['row_id', 'series_id','date', 'step', 'event', 'score']]
+    final_submission = final_submission[['row_id', 'series_id', 'step', 'event', 'score']]
 
     final_submission.to_csv('submission.csv', index=False, float_format='%.5f')
     return final_submission
 
 
-def reverse_events_if_below_min_count(submission: pd.DataFrame, min_count: int) -> pd.DataFrame:
+def reverse_events_by_step(submission: pd.DataFrame, event, min_step: int) -> pd.DataFrame:
+    # 이벤트가 변경되는 지점을 찾기
     submission['change_point'] = submission['event'].diff().ne(0).astype('int')
     submission.iloc[0, submission.columns.get_loc('change_point')] = 1
 
@@ -140,10 +152,13 @@ def reverse_events_if_below_min_count(submission: pd.DataFrame, min_count: int) 
     for i in range(len(change_points) - 1):
         start_idx = change_points[i]
         end_idx = change_points[i + 1] - 1
-        event_duration = end_idx - start_idx + 1
-        if event_duration <= min_count:
+
+        current_event = submission.loc[start_idx, 'event']
+        step_difference = submission.loc[end_idx, 'step'] - submission.loc[start_idx, 'step']
+
+        if current_event == event and step_difference <= min_step:
             submission.loc[start_idx:end_idx, 'event'] = 1 - submission.loc[start_idx:end_idx, 'event']
-    
+
     submission = submission.drop(columns=['change_point'])
 
     return submission
