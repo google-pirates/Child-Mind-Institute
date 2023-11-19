@@ -59,7 +59,7 @@ def inference(model_path: str, test_dataloader: DataLoader):
 
 def main(config):
 
-    with open('/kaggle/input/models/id_map.pickle', 'rb') as handle:
+    with open('./data/id_map.pickle', 'rb') as handle:
         id_map = pickle.load(handle)
     reverse_id_map = {v: k for k, v in id_map.items()}
 
