@@ -253,7 +253,7 @@ def main(config):
     example_batch = next(iter(train_dataloader))
  
     _, seq_len, n_features = example_batch['X'].shape
-    num_series_id = len(merged_train_data.series_id.unique())
+    num_series_id = merged_train_data.series_id.max() + 1
     config['train'].update({'seq_len': seq_len, 'n_features': n_features, 'num_series_id': num_series_id})
 
     ### train ###
