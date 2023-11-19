@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import Dataset
 from sklearn import preprocessing
 from datetime import datetime
+from scipy.ndimage import gaussian_filter1d
 import pandas as pd
 import numpy as np
 import pyarrow as pa
@@ -51,6 +52,17 @@ def preprocess(data, key: List[str] = ['series_id'], **kwargs) -> pd.DataFrame:
             .str.replace('^20', '', regex=True)
             .astype(np.int32)
         ) - 100000
+    
+    data['event_change'] = data.groupby(key).event.diff().fillna(method='bfill')
+    data['event_change'] = np.concatenate(data
+                                                       .groupby(key).event_change
+                                                       .apply(lambda x: gaussian_filter1d(x, sigma=5)).values)
+    data['event_change'] /= data['event_change'].max()
+    data['event_change'] *= 0.3
+    data['event'] = np.where(data.event_change >= 0,
+                                          data.event_change + 0.7,
+                                          data.event_change + 0.3)
+    data.drop(columns=['event_change'], inplace=True)
 
     return data
 
