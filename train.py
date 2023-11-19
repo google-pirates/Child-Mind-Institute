@@ -194,7 +194,7 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
         if valid_loss < best_loss:
             best_loss = valid_loss
             best_model = copy.deepcopy(model).cpu()
-            scripted_model = torch.jit.trace(best_model, {'X': inputs, 'y': labels, 'series_id': series_id})
+            scripted_model = torch.jit.trace(best_model, {'X': inputs.cpu(), 'y': labels.cpu(), 'series_id': series_id.cpu()})
             torch.jit.save(scripted_model, model_save_path)
             print(f"Best model saved to {model_save_path}")
 
