@@ -24,19 +24,18 @@ def inference(model_path: str, test_dataloader: DataLoader):
     with torch.no_grad():
         for batch in tqdm(test_dataloader, desc='Inference'):
             inputs = batch['X'].to(device)
-            # series_id를 Tensor로 변환
             series_ids = batch['series_id'].to(device)
+            # print(series_ids)
 
             steps = batch['step'].cpu().numpy()
             dates = batch['date'].cpu().numpy()
-            # 모델 입력을 딕셔너리 형태로 전달
             outputs = model({'X': inputs, 'series_id': series_ids})
 
             probabilities = torch.sigmoid(outputs)
             predictions = (probabilities > 0.5).float()
             scores = probabilities.detach().cpu().numpy()
 
-            all_series_ids.extend(batch['series_id'])  # 원래의 series_id를 사용
+            all_series_ids.extend(series_ids.tolist())
             all_steps.extend(steps.tolist())
             all_dates.extend(dates.tolist())
 
@@ -69,7 +68,7 @@ def main(config):
     test_data_path = config.get('general').get('test_data').get('path')
 
     test_data = pd.read_parquet(test_data_path)
-    test_data = test_data.query('series_id=="08db4255286f"')
+    # test_data = test_data.query('series_id=="08db4255286f"')
     test_data['event'] = -1
     test_data = test_data[['series_id', 'timestamp', 'step', 'event', 'anglez', 'enmo']]
     # test_data['timestamp'] = pd.to_datetime(test_data['timestamp'], format='%Y-%m-%d')
@@ -104,13 +103,14 @@ def main(config):
 
         submission = inference(model_path=config.get('general').get('checkpoint'),
                             test_dataloader=test_dataloader)
-        # submission['series_id'] = submission['series_id'].map(reverse_id_map)
+
+        submission['series_id'] = submission['series_id'].map(reverse_id_map)
 
         # submission = reverse_events_by_step(submission, 0, 360)
         # submission = reverse_events_by_step(submission, 1, 360)
-#         submission['event'] = submission['event'].rolling(window=500, min_periods=1, center=True).mean().apply(
-#             lambda x: 1 if x > 0.5 else (0 if pd.notnull(x) else np.nan)
-#         )
+        # submission['event'] = submission['event'].rolling(window=500, min_periods=1, center=True).mean().apply(
+        #     lambda x: 1 if x > 0.5 else (0 if pd.notnull(x) else np.nan)
+        # )
 
         # submission['event'] = submission['event'].map({0: 'onset', 1: 'wakeup'})
 
@@ -128,7 +128,7 @@ def main(config):
     if all_submissions:
         final_submission = pd.concat(all_submissions).reset_index(drop=True)
     else:
-        final_submission = pd.DataFrame(columns=['row_id', 'series_id', 'step', 'event', 'score'])
+        final_submission = pd.DataFrame(columns=['row_id', 'series_id','date', 'step', 'event', 'score'])
 
     final_submission['score'] = final_submission['score'].astype(float)
     #final_submission['score'] = final_submission['score'] / 10
