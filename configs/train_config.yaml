@@ -1,15 +1,15 @@
 train:
   model: 'TSMixer'
-  learning_rate: 0.01
-  batch_size: 32
-  window_size: 30
+  learning_rate: 0.001
+  batch_size: 512
+  window_size: 120
   random_seed: 42
   data:
     scaler: 'StandardScaler'
     shuffle: 'False'
   optimizer: 'Adam'
   criterion:
-    name: 'BCEWithLogitsLoss'
+    name: 'CrossEntropyLoss'
     params:
       reduction: 'mean'
   epochs: 5

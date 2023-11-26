@@ -20,10 +20,10 @@ model:
     fc_outputs: [40, 1]
     fc_dropout_rates: [0.4, 0.4]
   tsmixer:
-    out_seq_len: 1
-    n_block: 10
+    out_seq_len: 5
+    n_block: 5
     # target_slice: [1]
     normalization: 'LayerNorm'
     dropout_rates: 0.4
-    ff_dim: 10
+    ff_dim: 128
     activation: 'ReLU'
