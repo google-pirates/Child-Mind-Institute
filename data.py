@@ -67,8 +67,8 @@ def scale(data, config: Dict[str, str], scaler: object = None) -> None:
 
 def to_list(data, window_size: int, config: Dict[str, str], step: int = 1, key: List[str] = ['series_id'], scaler: object = None) -> List[pd.DataFrame]:
     data = [datum[1] for datum in data.groupby(key)]
-    for datum in data:
-        scale(datum, config, scaler)
+    # for datum in data:
+    #     scale(datum, config, scaler)
 
     start_of_feature_index = np.where(data[0].columns.str.find('event') == 0)[0].item()
     slided_window = [

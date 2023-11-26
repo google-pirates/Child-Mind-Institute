@@ -5,7 +5,8 @@ import pickle
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import confusion_matrix
+import re
+from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
 import torch
 from torch import nn, optim
@@ -81,6 +82,10 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
     # for tensorboard logging
     train_losses = []
     valid_losses = []
+    train_total_predictions = []
+    train_total_labels = []
+    valid_total_predictions = []
+    valid_total_labels = []
 
     for epoch in tqdm(range(num_epochs), desc='epoch'):
         # Training phase
@@ -88,7 +93,6 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
         training_loss = 0.0
         train_corrects = 0
         train_total_samples = 0
-        train_confusion_matrix = np.zeros((2, 2), dtype=np.int64)
         for batch in tqdm(train_dataloader, desc='train iter'):
             ## data에서 X, y 정의
             inputs = batch['X']
@@ -105,33 +109,40 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
             predictions = outputs.argmax(-1).float()
             train_corrects += torch.sum(predictions == labels)
             train_total_samples += inputs.size(0)
-            train_confusion_matrix += confusion_matrix(labels.cpu().numpy().reshape(-1), predictions.cpu().numpy().reshape(-1))
+            
+            assert labels.reshape(-1).shape == predictions.reshape(-1).shape
+            
+            train_total_predictions.extend(predictions.cpu().reshape(-1).tolist())
+            train_total_labels.extend(labels.cpu().reshape(-1).tolist())
+      
         avg_train_loss = training_loss / len(train_dataloader)
         train_losses.append(avg_train_loss)
         train_accuracy = train_corrects.double() / train_total_samples
 
-        tn, fp, fn, tp = train_confusion_matrix.ravel()
-        training_recall = tp / (tp+fn)
-        training_precision = tp / (tp+fp)
-
         print(f"[Epoch {epoch + 1}/{num_epochs}] "
               f"Training Loss: {avg_train_loss:.04f} | "
-              f"Training Accuracy: {train_accuracy:.04f} | "
-              f"Training Recall: {training_recall:.04f} | "
-              f"Training Precision: {training_precision:.04f} | "
-              f"Training F1: {2*(training_recall*training_precision)/(training_recall+training_precision):.04f} | ")
+              f"Training Accuracy: {train_accuracy:.04f} | ")
         writer.add_scalar('Loss/train', avg_train_loss, epoch)
         writer.add_scalar('Accuracy/train', train_accuracy, epoch)
-        writer.add_scalar('Recall/train', training_recall, epoch)
-        writer.add_scalar('Precision/train', training_precision, epoch)
-        writer.add_scalar('F1/train', 2*(training_recall*training_precision)/(training_recall+training_precision), epoch)
+
+
+        train_results = np.array(
+            [re.sub(' {2,}', ' ', i.strip()).split()[1:-1] for i in classification_report(train_total_labels, train_total_predictions).split('\n')[2:-5]],
+            dtype=np.float16)
+
+        print('Train')
+        for i, train_result in enumerate(train_results):            
+            print(f"[Final] [label {i}] "
+                f"Precision: {train_result[0]:.04f} | "
+                f"Recall: {train_result[1]:.04f} | "
+                f"F1: {train_result[2]:.04f} | ")
+            
 
         # Validation phase
         model.eval()
         valid_loss = 0.0
         valid_corrects = 0
         valid_total_samples = 0
-        valid_confusion_matrix = np.zeros((2, 2), dtype=np.int64)
         with torch.no_grad():
             for batch in tqdm(valid_dataloader, desc='valid iter'):
                 ## data에서 X, y 정의
@@ -146,28 +157,32 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
                 predictions = outputs.argmax(-1).float()
                 valid_corrects += torch.sum(predictions == labels)
                 valid_total_samples += inputs.size(0)
-                valid_confusion_matrix += confusion_matrix(labels.cpu().numpy().reshape(-1), predictions.cpu().numpy().reshape(-1))
+                
+                valid_total_predictions.extend(predictions.reshape(-1).cpu().tolist())
+                valid_total_labels.extend(labels.reshape(-1).cpu().tolist())
+
         avg_valid_loss = valid_loss / len(valid_dataloader)
         valid_losses.append(avg_valid_loss)
 
         valid_accuracy = valid_corrects.double() / valid_total_samples
 
-        tn, fp, fn, tp = valid_confusion_matrix.ravel()
-        valid_recall = tp / (tp+fn)
-        valid_precision = tp / (tp+fp)
-
         print(f"[Epoch {epoch + 1}/{num_epochs}] "
               f"Validation Loss: {avg_valid_loss:.04f} | "
-              f"Validation Accuracy: {valid_accuracy:.04f} | "
-              f"Validation Recall: {valid_recall:.04f} | "
-              f"Validation Precision: {valid_precision:.04f} | "
-              f"Validation F1: {2*(valid_recall*valid_precision)/(valid_recall+valid_precision):.04f} | ")
+              f"Validation Accuracy: {valid_accuracy:.04f} | ")
 
         writer.add_scalar('Loss/valid', avg_valid_loss, epoch)
         writer.add_scalar('Accuracy/valid', valid_accuracy, epoch)
-        writer.add_scalar('Recall/valid', valid_recall, epoch)
-        writer.add_scalar('Precision/valid', valid_precision, epoch)
-        writer.add_scalar('F1/valid', 2*(valid_recall*valid_precision)/(valid_recall+valid_precision), epoch)
+
+        valid_results = np.array(
+            [re.sub(' {2,}', ' ', i.strip()).split()[1:-1] for i in classification_report(valid_total_labels, valid_total_predictions).split('\n')[2:-5]],
+            dtype=np.float16)
+
+        print('Validation')
+        for i, valid_result in enumerate(valid_results):            
+            print(f"[Final] [label {i}] "
+                f"Precision: {valid_result[0]:.04f} | "
+                f"Recall: {valid_result[0]:.04f} | "
+                f"F1: {valid_result[2]:.04f} | ")
 
         # ReduceLROnPlateau를 사용하지 않는 경우 lr 업데이트 & 로깅
         if isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
@@ -209,15 +224,15 @@ def main(config):
 
     ## train data merge
     data_path = config.get('general').get('data').get('path')
+    
+    window_size = int(config.get('train').get('window_size'))
+    step = config.get('train').get('step')
 
-    merged_train_data = pd.read_parquet(data_path).iloc[:10000] ## merged_data.parquet
-    merged_train_data.event = merged_train_data.groupby('series_id').event.shift(-119)
+    merged_train_data = pd.read_parquet(data_path).reset_index(drop=True) ## merged_data.parquet
+    merged_train_data.event = merged_train_data.groupby('series_id').event.shift(-window_size+1)
     merged_train_data = merged_train_data.dropna()
 
     preprocessed_data = preprocess(merged_train_data)
-
-    window_size = int(config.get('train').get('window_size'))
-    step = config.get('train').get('step')
 
     train_list = to_list(preprocessed_data, window_size, config, step)
     train_keys = extract_keys(preprocessed_data, window_size, step)
@@ -242,12 +257,11 @@ def main(config):
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=train_data_shuffle)
     valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
 
-
     example_batch = next(iter(train_dataloader))
     
     _, n_features, seq_len = example_batch['X'].shape
-    config['train'].update(
-        {'seq_len': seq_len, 
+    config['train'].update({
+        'seq_len': seq_len, 
          'n_features': n_features,
          'n_labels': len(merged_train_data.event.unique()),
          })
