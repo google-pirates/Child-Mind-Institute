@@ -13,3 +13,6 @@ tensorboard/
 *.pickle
 *.zip
 *.7z
+data/test_train/enmo_std.npy
+data/test_train/enmo_mean.npy
+data/test_train/feature_list.npy
