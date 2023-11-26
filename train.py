@@ -228,7 +228,7 @@ def main(config):
     window_size = int(config.get('train').get('window_size'))
     step = config.get('train').get('step')
 
-    merged_train_data = pd.read_parquet(data_path).reset_index(drop=True) ## merged_data.parquet
+    merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet
     merged_train_data.event = merged_train_data.groupby('series_id').event.shift(-window_size+1)
     merged_train_data = merged_train_data.dropna()
 
@@ -263,7 +263,7 @@ def main(config):
     config['train'].update({
         'seq_len': seq_len, 
          'n_features': n_features,
-         'n_labels': len(merged_train_data.event.unique()+1),
+         'n_labels': int(merged_train_data.event.max()+1),
          })
 
     ### train ###
