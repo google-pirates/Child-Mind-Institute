@@ -263,7 +263,7 @@ def main(config):
     config['train'].update({
         'seq_len': seq_len, 
          'n_features': n_features,
-         'n_labels': len(merged_train_data.event.unique()),
+         'n_labels': len(merged_train_data.event.unique()+1),
          })
 
     ### train ###
