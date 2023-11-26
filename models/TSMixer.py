@@ -1,6 +1,7 @@
 from typing import Dict, Any
 import torch
 import torch.nn as nn
+from torchcrf import CRF
 
 
 class ResBlock(nn.Module):
@@ -66,6 +67,7 @@ class TSMixer(nn.Module):
         self.n_features = config.get('train').get('n_features')
         self.seq_len = config.get('train').get('seq_len')
         self.batch_size = config.get('train').get('batch_size')
+        self.n_labels = config.get('train').get('n_labels')
 
         self.out_seq_len = self.model_config.get('out_seq_len')
         self.n_block = self.model_config.get('n_block')
@@ -78,9 +80,14 @@ class TSMixer(nn.Module):
 
         self.final_dense = nn.Linear(self.n_features, self.out_seq_len)
 
+        ## CRF
+        self.tag_layer = nn.Linear(self.n_features, self.n_labels)
+        self.softmax = nn.Softmax()
+        self.crf = CRF(self.n_labels)
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
-        x = batch.get('X')  # batch, seq_len, n_features
+        x = batch.get('X').permute(0, 2, 1)  # batch, seq_len, n_features
+        y = batch.get('y').squeeze() if x.size(0) > 1 else batch.get('y')
         if x is None:
             raise ValueError("Input 'X' is not found in the batch") ## TorchScript에서 Optional[Tensor] 를 트래킹하기 위함
 
@@ -90,8 +97,6 @@ class TSMixer(nn.Module):
         if self.target_slice is not None:
             x = x[:, :, self.target_slice]
 
-        # x_transposed = x.transpose(1, 2)  # batch, n_features, seq_len
-        # x_out = self.final_dense(x_transposed)
-        # x_out = x_out.transpose(1, 2)  # batch, seq_len, n_features
-        x_selected = x[:, -1, :] ## 마지막 시간 단계를 이용하여 출력 생성
-        return self.final_dense(x_selected)
+        x_out = self.tag_layer(x)
+        loss = self.crf(x_out.permute(1, 0, 2), y.permute(1, 0))
+        return x_out, loss

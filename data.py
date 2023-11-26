@@ -19,7 +19,7 @@ class ChildInstituteDataset(Dataset):
     def __getitem__(self, idx):
         return {
             'X': torch.from_numpy(self.data[idx].get('X')),
-            'y': torch.Tensor([self.data[idx].get('event')]),
+            'y': torch.from_numpy(self.data[idx].get('event')).long(),
             'series_id': self.data[idx].get('series_id'),
             'date': self.data[idx].get('date'),
             'step': self.data[idx].get('step'),
@@ -70,7 +70,7 @@ def to_list(data, window_size: int, config: Dict[str, str], step: int = 1, key: 
     for datum in data:
         scale(datum, config, scaler)
 
-    start_of_feature_index = np.where(data[0].columns.str.find('anglez') == 0)[0].item()
+    start_of_feature_index = np.where(data[0].columns.str.find('event') == 0)[0].item()
     slided_window = [
             np.lib.stride_tricks.sliding_window_view(
                 datum.iloc[:, start_of_feature_index:],
@@ -87,6 +87,6 @@ def extract_keys(data, window_size: int, step: int = 1, key: List[str] = ['serie
         data.groupby(key).apply(lambda x: x.iloc[window_size-1:])
         .drop(columns=key)
         .reset_index()
-        .drop(columns=[f'level_{len(key)}', 'anglez', 'enmo'])
+        .drop(columns=[f'level_{len(key)}', 'event', 'anglez', 'enmo'])
         .to_dict('records')
     )[::step]

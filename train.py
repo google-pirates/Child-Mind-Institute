@@ -95,21 +95,17 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
             labels = batch['y']
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
-            outputs = model({'X': inputs, 'y': labels}) # [batch_size, 1]
-            # outputs = outputs.squeeze()  # [batch_size, 1] -> [batch_size]
-            # labels = labels.squeeze()
+            outputs, loss = model({'X': inputs, 'y': labels}) # ([batch_size, seq_len, n_labels], [batch_size, seq_len])
 
-            loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
-            training_loss += loss.item()
+            training_loss += (-loss.item())
 
             ## accuracy 추가
-            probabilities = torch.sigmoid(outputs)
-            predictions = (probabilities > 0.5).float()
+            predictions = outputs.argmax(-1).float()
             train_corrects += torch.sum(predictions == labels)
             train_total_samples += inputs.size(0)
-            train_confusion_matrix += confusion_matrix(labels.cpu().numpy(), predictions.cpu().numpy())
+            train_confusion_matrix += confusion_matrix(labels.cpu().numpy().reshape(-1), predictions.cpu().numpy().reshape(-1))
         avg_train_loss = training_loss / len(train_dataloader)
         train_losses.append(avg_train_loss)
         train_accuracy = train_corrects.double() / train_total_samples
@@ -142,19 +138,15 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
                 inputs = batch['X']
                 labels = batch['y']
                 inputs, labels = inputs.to(device), labels.to(device)
-                outputs = model({'X': inputs, 'y': labels}) # [batch_size, 1]
-                # outputs = outputs.squeeze()  # [batch_size, 1] -> [batch_size]
-                # labels = labels.squeeze()
+                outputs, loss = model({'X': inputs, 'y': labels}) # ([batch_size, seq_len, n_labels], [batch_size, seq_len])
 
-                loss = criterion(outputs, labels)
-                valid_loss += loss.item()
+                valid_loss += (-loss.item())
 
                 ## accuracy 추가
-                probabilities = torch.sigmoid(outputs)
-                predictions = (probabilities > 0.5).float()
+                predictions = outputs.argmax(-1).float()
                 valid_corrects += torch.sum(predictions == labels)
                 valid_total_samples += inputs.size(0)
-                valid_confusion_matrix += confusion_matrix(labels.cpu().numpy(), predictions.cpu().numpy())
+                valid_confusion_matrix += confusion_matrix(labels.cpu().numpy().reshape(-1), predictions.cpu().numpy().reshape(-1))
         avg_valid_loss = valid_loss / len(valid_dataloader)
         valid_losses.append(avg_valid_loss)
 
@@ -191,7 +183,7 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
         if valid_loss < best_loss:
             best_loss = valid_loss
             best_model = copy.deepcopy(model).cpu()
-            scripted_model = torch.jit.script(best_model)
+            scripted_model = torch.jit.trace(best_model, {'X': inputs.cpu(), 'y': labels.cpu()})
             torch.jit.save(scripted_model, model_save_path)
             print(f"Best model saved to {model_save_path}")
 
@@ -218,9 +210,9 @@ def main(config):
     ## train data merge
     data_path = config.get('general').get('data').get('path')
 
-    merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet
-    # merged_train_data = merged_train_data.iloc[::20]
-    merged_train_data['timestamp'] = pd.to_datetime(merged_train_data['timestamp'], format='%Y-%m-%d')
+    merged_train_data = pd.read_parquet(data_path).iloc[:10000] ## merged_data.parquet
+    merged_train_data.event = merged_train_data.groupby('series_id').event.shift(-119)
+    merged_train_data = merged_train_data.dropna()
 
     preprocessed_data = preprocess(merged_train_data)
 
@@ -229,9 +221,10 @@ def main(config):
 
     train_list = to_list(preprocessed_data, window_size, config, step)
     train_keys = extract_keys(preprocessed_data, window_size, step)
-
+    
     for i, train_key in enumerate(train_keys):
-        train_key['X'] = train_list[i]
+        train_key['event'] = train_list[i][0]
+        train_key['X'] = train_list[i][1:]
     train_list = train_keys
 
     valid_set_size = config.get('train').get('valid_size', 0.2)
@@ -252,8 +245,12 @@ def main(config):
 
     example_batch = next(iter(train_dataloader))
     
-    _, seq_len, n_features = example_batch['X'].shape
-    config['train'].update({'seq_len': seq_len, 'n_features': n_features})
+    _, n_features, seq_len = example_batch['X'].shape
+    config['train'].update(
+        {'seq_len': seq_len, 
+         'n_features': n_features,
+         'n_labels': len(merged_train_data.event.unique()),
+         })
 
     ### train ###
     model_name = config.get('train').get('model')
