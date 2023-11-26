@@ -59,7 +59,7 @@ class ResBlock(nn.Module):
 
 
 class TSMixer(nn.Module):
-    def __init__(self, config: Dict[str, Any], **kwargs):
+    def __init__(self, config: Dict[str, Any]):
         super(TSMixer, self).__init__()
 
         self.model_config = config.get('model').get('tsmixer')
