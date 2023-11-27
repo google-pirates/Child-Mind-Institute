@@ -19,7 +19,7 @@ class ChildInstituteDataset(Dataset):
     def __getitem__(self, idx):
         return {
             'X': torch.from_numpy(self.data[idx].get('X')),
-            'y': torch.Tensor([self.data[idx].get('event')]),
+            'y': torch.Tensor([self.data[idx].get('event')]).long(),
             'series_id': self.data[idx].get('series_id'),
             'date': self.data[idx].get('date'),
             'step': self.data[idx].get('step'),

@@ -109,7 +109,6 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
 
             ## accuracy 추가
             predictions = outputs.argmax(axis=-1)
-            labels = labels.argmax(axis=-1)
             train_corrects += torch.sum(predictions == labels)
             train_total_samples += inputs.size(0)
 
@@ -156,7 +155,6 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
 
                 ## accuracy 추가
                 predictions = outputs.argmax(axis=-1)
-                labels = labels.argmax(axis=-1)
                 valid_corrects += torch.sum(predictions == labels)
                 valid_total_samples += inputs.size(0)
 
@@ -227,12 +225,6 @@ def main(config):
     data_path = config.get('general').get('data').get('path')
 
     merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet
-    labels = np.zeros(shape=((len(merged_train_data), 5)))
-    labels[merged_train_data.event==0, 0] = 1
-    labels[merged_train_data.event==1, 1] = 1
-    labels[merged_train_data.event==2, 2] = 1
-    labels[merged_train_data.event==3, 3] = 1
-    labels[merged_train_data.event==4, 4] = 1
 
     preprocessed_data = preprocess(merged_train_data)
 
@@ -244,7 +236,6 @@ def main(config):
 
     for i, train_key in enumerate(train_keys):
         train_key['X'] = train_list[i]
-        train_key['event'] = labels[i]
     train_list = train_keys
 
     valid_set_size = config.get('train').get('valid_size', 0.2)
