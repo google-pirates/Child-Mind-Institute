@@ -79,10 +79,11 @@ def main(config):
 
     unique_series_ids = test_data['series_id'].unique()
     all_submissions = []
-
+    cnt = 0
     for series_id in unique_series_ids:
-        if series_id > 0:
+        if cnt > 0:
             break
+        cnt+=1
         series_data = test_data[test_data['series_id'] == series_id].copy()
         series_data.reset_index(drop=True, inplace=True)
 
