@@ -175,7 +175,7 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
 
         print('Validation')
         valid_results = np.array(
-            [re.sub(' {2,}', ' ', i.strip()).split()[1:-1] for i in classification_report(train_total_labels, train_total_predictions).split('\n')[2:-5]],
+            [re.sub(' {2,}', ' ', i.strip()).split()[1:-1] for i in classification_report(valid_total_labels, valid_total_predictions).split('\n')[2:-5]],
             dtype=np.float16)
         for i, valid_result in enumerate(valid_results):            
             print(f"[Final] [label {i}] "
