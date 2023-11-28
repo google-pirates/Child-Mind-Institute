@@ -27,10 +27,10 @@ def inference(model_path: str, test_dataloader: DataLoader):
             series_ids = batch['series_id']
             steps = batch['step'].cpu().numpy()
             dates = batch['date'].cpu().numpy()
-            outputs = model({'X': inputs})
 
-            predictions = outputs.argmax(axis=-1)
-            probabilities = torch.sigmoid(outputs)
+            outputs = model({'X': inputs.permute(0, 2, 1)})
+            probabilities = torch.softmax(outputs, dim=1)
+            predictions = torch.argmax(probabilities, dim=1)
             scores = probabilities.detach().cpu().numpy()
 
             all_series_ids.extend(series_ids.tolist())
@@ -40,10 +40,9 @@ def inference(model_path: str, test_dataloader: DataLoader):
             batch_predictions = predictions.cpu().numpy().astype(int).tolist()
             for pred in batch_predictions:
                 all_events.append(pred)
-
-            batch_scores = scores.tolist()
-            for score in batch_scores:
-                all_scores.append(score[0])
+                
+            for score in scores:
+                all_scores.append(max(score)) 
 
     submission = pd.DataFrame({
         'series_id': all_series_ids,
