@@ -28,7 +28,7 @@ def inference(model_path: str, test_dataloader: DataLoader):
             steps = batch['step'].cpu().numpy()
             dates = batch['date'].cpu().numpy()
 
-            outputs = model({'X': inputs.permute(0, 2, 1)})
+            outputs = model({'X': inputs})
             probabilities = torch.softmax(outputs, dim=1)
             predictions = torch.argmax(probabilities, dim=1)
             scores = probabilities.detach().cpu().numpy()
@@ -40,7 +40,7 @@ def inference(model_path: str, test_dataloader: DataLoader):
             batch_predictions = predictions.cpu().numpy().astype(int).tolist()
             for pred in batch_predictions:
                 all_events.append(pred)
-                
+
             for score in scores:
                 all_scores.append(max(score)) 
 
@@ -56,14 +56,13 @@ def inference(model_path: str, test_dataloader: DataLoader):
 
 
 def main(config):
-    # Load preprocessed data for inference
     test_data_path = config.get('general').get('test_data').get('path')
-    
+
     test_data = pd.read_parquet(test_data_path)
     test_data['event'] = -1
-    
+
     with open('./data/id_map.pickle', 'rb') as handle:
-            id_map = pickle.load(handle)
+        id_map = pickle.load(handle)
     reverse_id_map = {v: k for k, v in id_map.items()}
     
     window_size = config.get('inference').get('window_size')
@@ -121,10 +120,10 @@ def main(config):
     else:
         final_submission = pd.DataFrame(columns=['row_id', 'series_id', 'step', 'event', 'score'])
 
-    final_submission['event'] = np.where(final_submission['event']==3, 1, final_submission['event'])
-    final_submission['event'] = np.where(final_submission['event']==4, 0, final_submission['event'])
+    # final_submission['event'] = np.where(final_submission['event']==3, 1, final_submission['event'])
+    # final_submission['event'] = np.where(final_submission['event']==4, 0, final_submission['event'])
 
-    final_submission['event'] = final_submission['event'].map({0: 'onset', 1: 'wakeup'})
+    # final_submission['event'] = final_submission['event'].map({0: 'onset', 1: 'wakeup'})
     final_submission['score'] = final_submission['score'].astype(float)
 
     final_submission['score'] = np.where( final_submission['event'] == 'onset',
@@ -140,7 +139,6 @@ def main(config):
 
 
 def reverse_events_by_step(submission: pd.DataFrame, event, min_step: int) -> pd.DataFrame:
-    # 이벤트가 변경되는 지점을 찾기
     submission['change_point'] = submission['event'].diff().ne(0).astype('int')
     submission.iloc[0, submission.columns.get_loc('change_point')] = 1
 
