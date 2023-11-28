@@ -106,22 +106,22 @@ def main(config):
         submission = inference(model_path=config.get('general').get('checkpoint'),
                             test_dataloader=test_dataloader)
         submission['series_id'] = submission['series_id'].map(reverse_id_map)
-        submission['event'] = np.where(submission['event']==3, 1, submission['event'])
-        submission['event'] = np.where(submission['event']==4, 0, submission['event'])
+        # submission['event'] = np.where(submission['event']==3, 1, submission['event'])
+        # submission['event'] = np.where(submission['event']==4, 0, submission['event'])
 
-        submission['event'] = submission['event'].rolling(window = 30, min_periods=1, center=True).mean().apply(
-            lambda x: 1 if x > 0.5 else (0 if pd.notnull(x) else np.nan)
-        )
-        submission = reverse_events_by_step(submission, 0, 300)
-        submission = reverse_events_by_step(submission, 1, 300)
+        # submission['event'] = submission['event'].rolling(window = 30, min_periods=1, center=True).mean().apply(
+            # lambda x: 1 if x > 0.5 else (0 if pd.notnull(x) else np.nan)
+        # )
+        # submission = reverse_events_by_step(submission, 0, 300)
+        # submission = reverse_events_by_step(submission, 1, 300)
         ##
-        first_rows = submission.groupby('series_id').head(1)
-        submission['event_change'] = submission['event'] != submission['event'].shift(1)
-        submission.loc[0, 'event_change'] = False
+        # first_rows = submission.groupby('series_id').head(1)
+        # submission['event_change'] = submission['event'] != submission['event'].shift(1)
+        # submission.loc[0, 'event_change'] = False
 
-        changed_events = submission[submission['event_change']]
-        submission = pd.concat([first_rows, changed_events]).drop_duplicates().sort_values(['series_id', 'step'])
-        submission = submission.drop(columns=['event_change'])
+        # changed_events = submission[submission['event_change']]
+        # submission = pd.concat([first_rows, changed_events]).drop_duplicates().sort_values(['series_id', 'step'])
+        # submission = submission.drop(columns=['event_change'])
         ##
         all_submissions.append(submission)
 
@@ -142,7 +142,7 @@ def main(config):
 
     final_submission = final_submission.sort_values(['series_id', 'step']).reset_index(drop=True)
     final_submission['row_id'] = final_submission.index.astype(int)
-    final_submission = final_submission[['row_id', 'series_id', 'step', 'event', 'score']]
+    final_submission = final_submission[['row_id', 'series_id', 'date', 'step', 'event', 'score']]
 
     final_submission.to_csv('submission.csv', index=False, float_format='%.5f')
     return final_submission
