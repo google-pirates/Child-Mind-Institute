@@ -21,18 +21,6 @@ import models
 
 def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
           valid_dataloader: DataLoader, writer) -> nn.Module:
-    """
-    Train model, save and return best model.
-
-    Parameters:
-    - config (dict): Configuration dictionary.
-    - model (nn.Module): Model to train.
-    - train_dataloader (DataLoader): DataLoader for train data.
-    - valid_dataloader (DataLoader): DataLoader for validation data.
-
-    Returns:
-    - nn.Module: The model based on lowest valid loss.
-    """
     torch.manual_seed(config.get('train').get('random_seed'))
 
     model_save_dir = os.path.join(writer.log_dir, 'saved_models') 
@@ -93,28 +81,22 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
         training_loss = 0.0
         train_corrects = 0
         train_total_samples = 0
-        train_confusion_matrix = np.zeros((2, 2), dtype=np.int64)
+
         for batch in tqdm(train_dataloader, desc='train iter'):
-            ## data에서 X, y 정의
             inputs = batch['X']
-            labels = batch['y'].squeeze()
+            labels = batch['y']
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
-            outputs = model({'X': inputs, 'y': labels}) # [batch_size, 1]
+            outputs = model({'X': inputs, 'y': labels})
 
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
             training_loss += loss.item()
 
-            ## accuracy 추가
-            predictions = outputs.argmax(axis=-1)
-            labels = labels.argmax(axis=-1)
+            predictions = outputs.argmax(axis=-1) 
             train_corrects += torch.sum(predictions == labels)
             train_total_samples += inputs.size(0)
-
-            train_total_predictions.extend(predictions.cpu().tolist())
-            train_total_labels.extend(labels.tolist())
 
         avg_train_loss = training_loss / len(train_dataloader)
         train_losses.append(avg_train_loss)
@@ -142,21 +124,18 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
         valid_loss = 0.0
         valid_corrects = 0
         valid_total_samples = 0
-        valid_confusion_matrix = np.zeros((2, 2), dtype=np.int64)
+
         with torch.no_grad():
             for batch in tqdm(valid_dataloader, desc='valid iter'):
-                ## data에서 X, y 정의
                 inputs = batch['X']
-                labels = batch['y'].squeeze()
+                labels = batch['y']  
                 inputs, labels = inputs.to(device), labels.to(device)
-                outputs = model({'X': inputs, 'y': labels}) # [batch_size, 1]
+                outputs = model({'X': inputs, 'y': labels})
 
                 loss = criterion(outputs, labels)
                 valid_loss += loss.item()
 
-                ## accuracy 추가
-                predictions = outputs.argmax(axis=-1)
-                labels = labels.argmax(axis=-1)
+                predictions = outputs.argmax(axis=-1) 
                 valid_corrects += torch.sum(predictions == labels)
                 valid_total_samples += inputs.size(0)
 
@@ -185,7 +164,6 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
                 f"Recall: {valid_result[0]:.04f} | "
                 f"F1: {valid_result[2]:.04f} | ")
 
-        # ReduceLROnPlateau를 사용하지 않는 경우 lr 업데이트 & 로깅
         if isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
             scheduler.step(valid_loss / len(valid_dataloader))
         else:
@@ -215,25 +193,15 @@ def train(config: dict, model: nn.Module, train_dataloader: DataLoader,
     return scripted_model
 
 def main(config):
-    ## parsing은 script에서 수행
 
     tensorboard_path = config.get('general').get('tensorboard').get('path')
 
-    # Tensorboard
     log_dir = make_logdir(tensorboard_path, config.get('general').get('exp_name'))
     writer = SummaryWriter(log_dir=log_dir)
 
-    ## train data merge
     data_path = config.get('general').get('data').get('path')
 
-    merged_train_data = pd.read_parquet(data_path) ## merged_data.parquet
-    labels = np.zeros(shape=((len(merged_train_data), 5)))
-    labels[merged_train_data.event==0, 0] = 1
-    labels[merged_train_data.event==1, 1] = 1
-    labels[merged_train_data.event==2, 2] = 1
-    labels[merged_train_data.event==3, 3] = 1
-    labels[merged_train_data.event==4, 4] = 1
-
+    merged_train_data = pd.read_parquet(data_path)
     preprocessed_data = preprocess(merged_train_data)
 
     window_size = int(config.get('train').get('window_size'))
@@ -244,7 +212,6 @@ def main(config):
 
     for i, train_key in enumerate(train_keys):
         train_key['X'] = train_list[i]
-        train_key['event'] = labels[i]
     train_list = train_keys
 
     valid_set_size = config.get('train').get('valid_size', 0.2)

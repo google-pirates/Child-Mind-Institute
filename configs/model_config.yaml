@@ -27,3 +27,7 @@ model:
     dropout_rates: 0.4
     ff_dim: 128
     activation: 'ReLU'
+  lstflinear:
+    out_seq_len: 5
+    individual: True
+    kernel_size: 25

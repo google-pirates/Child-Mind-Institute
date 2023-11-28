@@ -1,7 +1,7 @@
 train:
-  model: 'TSMixer'
+  model: 'LSTFLinear'
   learning_rate: 0.001
-  batch_size: 512
+  batch_size: 64
   window_size: 120
   random_seed: 42
   data:
