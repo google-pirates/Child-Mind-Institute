@@ -62,14 +62,7 @@ def main(config):
     
     test_data = pd.read_parquet(test_data_path)
     test_data['event'] = -1
-
-    labels = np.zeros(shape=((len(test_data), 5)))
-    labels[test_data.event==0, 0] = 1
-    labels[test_data.event==1, 1] = 1
-    labels[test_data.event==2, 2] = 1
-    labels[test_data.event==3, 3] = 1
-    labels[test_data.event==4, 4] = 1
-
+    
     with open('./data/id_map.pickle', 'rb') as handle:
             id_map = pickle.load(handle)
     reverse_id_map = {v: k for k, v in id_map.items()}
@@ -94,7 +87,6 @@ def main(config):
 
         for i, key in enumerate(test_keys):
             key['X'] = test_list[i]
-            key['event'] = labels[i]
         test_list = test_keys
 
         test_dataset = ChildInstituteDataset(test_list)
