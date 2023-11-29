@@ -13,8 +13,11 @@ tensorboard/
 *.pickle
 *.zip
 *.7z
+<<<<<<< HEAD
 data/test_train/enmo_std.npy
 data/test_train/enmo_mean.npy
 data/test_train/feature_list.npy
 inefer_test.ipynb
 inefer_test.ipynb
+=======
+>>>>>>> parent of d0bf7a3 (refactoring inference)
