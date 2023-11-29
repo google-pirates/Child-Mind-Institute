@@ -16,3 +16,5 @@ tensorboard/
 data/test_train/enmo_std.npy
 data/test_train/enmo_mean.npy
 data/test_train/feature_list.npy
+inefer_test.ipynb
+inefer_test.ipynb

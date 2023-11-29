@@ -42,7 +42,7 @@ def inference(model_path: str, test_dataloader: DataLoader):
                 all_events.append(pred)
 
             for score in scores:
-                all_scores.append(max(score)) 
+                all_scores.append(max(score))
 
     submission = pd.DataFrame({
         'series_id': all_series_ids,
