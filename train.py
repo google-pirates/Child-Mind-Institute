@@ -90,7 +90,7 @@ def train(config, model, train_dataloader, valid_dataloader):
             loss = criterion(outputs.reshape(-1, config.get('train').get('n_features')), labels.long().flatten())
 
             total_valid_loss += loss.item() * inputs.size(0)
-            _, preds = torch.max(outputs, 1)
+            preds = outputs.argmax(axis=-1)
             total_valid_corrects += torch.sum(preds == labels)
             total_valid_samples += inputs.size(0)
             valid_labels.extend(labels.cpu().numpy())
