@@ -104,7 +104,7 @@ def train(config, model, train_dataloader, valid_dataloader):
 def main(config):
     ## Get n_features and seq_len
     ex_data = pd.read_parquet(config['general']['data']['path'])
-    ex_data = ex_data.iloc[:config['train'][window_size]+1]
+    ex_data = ex_data.iloc[:config['train']['window_size']+1]
     label_mapping = {0: 0, 1: 1, 3: 2, 4: 3}
     ex_data['event'] = [label_mapping[label] for label in ex_data['event']]
     preprocessed_ex_data = preprocess(ex_data)
