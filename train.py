@@ -102,7 +102,27 @@ def train(config, model, train_dataloader, valid_dataloader):
     return avg_train_loss, train_accuracy, train_preds, train_labels, avg_valid_loss, valid_accuracy, valid_preds, valid_labels
 
 def main(config):
+    ## Get n_features and seq_len
+    ex_data = pd.read_parquet(config['general']['data']['path'])
+    ex_data = ex_data.iloc[:config['train'][window_size]+1]
+    label_mapping = {0: 0, 1: 1, 3: 2, 4: 3}
+    ex_data['event'] = [label_mapping[label] for label in ex_data['event']]
+    preprocessed_ex_data = preprocess(ex_data)
+    ex_list = to_list(preprocessed_ex_data, config['train']['window_size'], config, 1)
+    ex_keys = extract_keys(preprocessed_ex_data, config['train']['window_size'],1)
+    for i, key in enumerate(ex_keys):
+        key['X'] = ex_list[i][:,1:]
+        key['event'] = ex_list[i][0]
+    ex_list = ex_keys
 
+    ex_dataset = ChildInstituteDataset(ex_list)
+    ex_dataloader = DataLoader(ex_dataset, batch_size=128, shuffle=False)
+
+    example_batch = next(iter(ex_dataloader))
+    _, n_features, seq_len = example_batch['X'].shape
+
+    config['train'].update({'seq_len': seq_len, 'n_features': n_features})
+    ##
     tensorboard_path = config.get('general').get('tensorboard').get('path')
 
     log_dir = make_logdir(tensorboard_path, config.get('general').get('exp_name'))
@@ -203,5 +223,5 @@ def main(config):
             best_model = copy.deepcopy(model)
             torch.jit.save(torch.jit.script(best_model), model_save_path)
 
-    with open(f'./configs.pickle', 'wb') as file:
+    with open(f'.{log_dir}/configs.pickle', 'wb') as file:
         pickle.dump(config, file)
