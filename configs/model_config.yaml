@@ -27,3 +27,33 @@ model:
     dropout_rates: 0.4
     ff_dim: 10
     activation: 'ReLU'
+  grunet:
+    block:
+        cell_type: GRU
+        activation: 'LeakyReLU'
+        normalization_layer: LayerNorm
+        hidden_size: 256
+        n_stacks: 1
+        n_layers: 2
+        dropout_rates: 0.4
+        bidirectional: True
+    rnn:
+      hidden_size: 256
+      output_size: 64
+      dropout_rates: 0.4
+      n_layers: 5
+      cell_type: GRU
+      activation: 'LeakyReLU'
+      normalization_layer: LayerNorm
+    encoder_block:
+      activation: 'LeakyReLU'
+      normalization_layer: LayerNorm
+      dropout_rates: 0.4
+    grunet:
+      out_channels: [8, 32, 64]
+      kernel_sizes: [17, 11, 7]
+      strides: [2, 2, 2]
+      dilations: [1]
+      dropout_rates: 0.4
+      deconvolution_paddings: [5]
+
